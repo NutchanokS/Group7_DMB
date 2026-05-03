@@ -1,0 +1,104 @@
+---
+title: "The Intermission Challenge Group 7"
+subtitle: "ETF3480 - ETF5480 Assignment 2"
+author:
+  - "Tzu-Hsuan Yang (35461586)"
+  - "Nutchanok Saitin (35493011)"
+  - "Mohammad Zulkifli Falaqi"
+  - "Bagas Wibawanto"
+toc: true
+format:
+  pdf:
+    pdf-engine: lualatex
+    documentclass: scrartcl
+    classoption: ["11pt", "onecolumn"]
+    geometry:
+      - a4paper
+      - margin=20mm
+    number-sections: false
+    colorlinks: true
+    include-in-header:
+      text: |
+        % --- Title page formatting ---
+        \setkomafont{title}{\LARGE\bfseries}
+        \setkomafont{subtitle}{\fontsize{16pt}{11pt}\selectfont}
+        \setkomafont{author}{\fontsize{12pt}{8pt}\selectfont}
+
+        % --- Spacing: lines + paragraphs ---
+        \usepackage{setspace}
+        \setstretch{1.08}
+        \KOMAoptions{parskip=half}
+
+        % --- Optional: nicer text handling ---
+        \usepackage{microtype}
+
+        % --- Improve section heading clarity ---
+        \usepackage{xcolor}
+        \definecolor{sectionblue}{HTML}{1A237E}
+        \definecolor{subhdgray}{gray}{0.25}
+
+        \usepackage{titlesec}
+
+        % \section
+        \titleformat{\section}
+          {\normalfont\Large\bfseries\color{sectionblue}}{}{0em}{}
+        \titlespacing*{\section}{0pt}{16pt plus 2pt minus 2pt}{10pt}
+
+        % \subsection
+        \titleformat{\subsection}
+          {\normalfont\large\bfseries\color{subhdgray}}{}{0em}{}
+        \titlespacing*{\subsection}{0pt}{14pt plus 2pt minus 2pt}{8pt}
+
+        % \subsubsection
+        \titleformat{\subsubsection}
+          {\normalfont\normalsize\bfseries\color{subhdgray}}{}{0em}{}
+        \titlespacing*{\subsubsection}{0pt}{12pt plus 1pt minus 2pt}{6pt}
+
+        % --- Styled quote block with subtle bar ---
+        \usepackage[most]{tcolorbox}
+        \definecolor{quotebar}{gray}{0.70}
+        \newtcolorbox{myquote}{enhanced,breakable,
+          colback=white, colframe=quotebar,
+          left=8pt, right=6pt, top=4pt, bottom=4pt,
+          boxrule=0pt, leftrule=2pt, rightrule=0pt, toprule=0pt, bottomrule=0pt}
+        \renewenvironment{quote}{\begin{myquote}\itshape}{\end{myquote}}
+
+mainfont: "Arial"
+sansfont: "Arial"
+linestretch: 1.02
+papersize: a4
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+knitr::opts_chunk$set(echo = TRUE, eval=TRUE, error=TRUE, cache=FALSE)
+```
+
+\newpage
+
+# Introduction and background
+
+During performances, the concert hall has a strict 25-minute intermission. This short period can create a sudden rush to restroom facilities and cause serious congestion. Management has received increasing complaints about long waiting times and the lack of inclusive restroom design. Therefore, this problem is not only about reducing queues, but also about improving fairness and accessibility for different users.
+
+Historical observations show that restroom users do not all behave in the same way. Users can have different service-time needs and different preferences for restroom types. Some users prefer gender-segregated facilities, some have no strong preference, and some prefer unisex facilities. Because of this, the best restroom design should not only have shorter average waiting times, but should also consider whether different user groups are treated fairly.
+
+This report evaluates three possible restroom configurations: the Status Quo, the All Unisex model, and the Hybrid model. The analysis uses queueing theory to estimate waiting-time performance, simulation to test more realistic intermission conditions, and fairness measures to compare the experience of different user groups.
+
+The three configurations evaluated in this report are:
+  
+  1. **Status Quo**: 20 women’s stalls, 10 men’s urinals, and 10 men’s stalls.
+  2. **All Unisex**: 40 universal all-gender stalls.
+  3. **Hybrid Model**: 15 women’s stalls, 10 men’s urinals, 5 men’s stalls, and 10 unisex stalls.
+
+The aim of this report is to provide management with a clear recommendation about which configuration should be used. The recommended design should reduce congestion during intermission while also supporting a more inclusive restroom system.
+
+
+# Analytical Methods
+
+# Results
+
+# Discussions of results and business recommendation
+
+# Conclusion and further suggested work
