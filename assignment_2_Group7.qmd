@@ -78,7 +78,7 @@ knitr::opts_chunk$set(echo = TRUE, eval=TRUE, error=TRUE, cache=FALSE)
 
 \newpage
 
-# Introduction and background
+# 1. Introduction and background
 
 During performances, the concert hall has a strict 25-minute intermission. This short period can create a sudden rush to restroom facilities and cause serious congestion. Management has received increasing complaints about long waiting times and the lack of inclusive restroom design. Therefore, this problem is not only about reducing queues, but also about improving fairness and accessibility for different users.
 
@@ -87,191 +87,352 @@ Historical observations show that restroom users do not all behave in the same w
 This report evaluates three possible restroom configurations: the Status Quo, the All Unisex model, and the Hybrid model. The analysis uses queueing theory to estimate waiting-time performance, simulation to test more realistic intermission conditions, and fairness measures to compare the experience of different user groups.
 
 The three configurations evaluated in this report are:
-  
-  1. **Status Quo**: 20 women’s stalls, 10 men’s urinals, and 10 men’s stalls.
-  2. **All Unisex**: 40 universal all-gender stalls.
-  3. **Hybrid Model**: 15 women’s stalls, 10 men’s urinals, 5 men’s stalls, and 10 unisex stalls.
+
+1.  **Status Quo**: 20 women’s stalls, 10 men’s urinals, and 10 men’s stalls.
+2.  **All Unisex**: 40 universal all-gender stalls.
+3.  **Hybrid Model**: 15 women’s stalls, 10 men’s urinals, 5 men’s stalls, and 10 unisex stalls.
 
 The aim of this report is to provide management with a clear recommendation about which configuration should be used. The recommended design should reduce congestion during intermission while also supporting a more inclusive restroom system.
 
+# 2. Analytical Methods
 
-# Analytical Methods
+# 3. Results
 
-# Results
+The analysis proceeds in two phases. First, a closed-form analytical model establishes baseline performance metrics and equity scores for each configuration under idealised steady-state conditions. These results are then stress-tested through discrete-event simulation to examine system behaviour under realistic intermission demand patterns.
 
-# Discussions of results and business recommendation
+## 3.1 Model Parameter and Assumptions
 
-# Conclusion and further suggested work
+Before presenting results, this section summarises the input parameters and modelling assumptions applied consistently across all configurations and scenarios. These values are derived directly from the historical observation data provided in the case.
 
-/newpage
+### 3.1.1 Input Parameters
+
+**Table 1 — Observed Input Parameters**
+
+![](images/paste-2.png){fig-align="center" width="449"}
+
+**Table 2 — User Preference Distribution**
+
+| Preference Type        | Proportion |
+|:-----------------------|:----------:|
+| Gender-segregated (GS) |    70%     |
+| No preference (NP)     |    21%     |
+| Unisex (UX)            |     9%     |
+
+> Applies equally to both genders and across all configurations.
+
+**Table 3 — User Satisfaction Score Table**
+
+![](images/paste-1.png)
+
+**Table 4 — Configuration Fixture Allocation**
+
+| Restroom Type  | Config 1 | Config 2 | Config 3 |
+|:---------------|:--------:|:--------:|:--------:|
+| Women's stalls |    20    |    \-    |    15    |
+| Men's urinals  |    10    |    \-    |    10    |
+| Men's stalls   |    10    |    \-    |    5     |
+| Unisex stalls  |    \-    |    40    |    10    |
+| **Total**      |  **40**  |  **40**  |  **40**  |
+
+### 3.1.2 Modelling Assumptions
+
+The following assumptions are applied throughout the analysis:
+
+-   Arrivals follow a Poisson process. The concert hall has a fixed total audience capacity, of which a certain proportion are expected to seek restroom access during the intermission, collectively reflected in an aggregate arrival rate of 6.4 pers/min across all genders. Each gender's individual arrival rate is then derived proportionally from this aggregate based on the assumed gender composition of the audience.
+
+-   Service times are treated as a general distribution, characterised by the empirically observed mean and SD from the historical data.
+
+-   For the baseline analysis, no-preference users are assumed to split equally (50-50) between gender-segregated and unisex facilities where available. In the simulation scenarios, this routing rule is replaced by a shortest queue length rule or shortest expected wait time rule, reflecting more realistic decision-making behaviour under congestion.
+
+-   Gender-diverse patrons are acknowledged qualitatively but excluded from quantitative scoring due to the absence of arrival rate data in the historical observations.
+
+-   Steady-state conditions are assumed for the baseline analytical model.
+
+## 3.2 Baseline System Performance
+
+Before presenting results, this section summarises the input parameters and modelling assumptions applied consistently across all configurations and scenarios. These values are derived directly from the historical observation data provided in the case.
+
+### 3.2.1 Configuration 1: Status Quo
+
+**Queuing performance**
+
+![](images/paste-3.png)
+
+**Fairness scores**
+
+![](images/paste-5.png)
+
+|      Metrics      | Score |
+|:-----------------:|:-----:|
+| Totalitarian (Tr) | 4.82  |
+|   Rawlsian (Mr)   |   3   |
+
+### 3.2.2 Configuration 2: All Unisex
+
+**Queuing performance**
+
+![](images/paste-6.png)
+
+**Fairness scores**
+
+![](images/paste-7.png)
+
+|      Metrics      | Score |
+|:-----------------:|:-----:|
+| Totalitarian (Tr) |  4.3  |
+|   Rawlsian (Mr)   |   4   |
+
+### 3.2.3 Configuration 3: Hybrid Model
+
+**Queuing performance**
+
+![](images/paste-4.png)
+
+**Fairness scores**
+
+![](images/paste-8.png)
+
+|      Metrics      | Score |
+|:-----------------:|:-----:|
+| Totalitarian (Tr) |   5   |
+|   Rawlsian (Mr)   |   5   |
+
+### 3.2.4 Comparative Equity Analysis
+
+In general, all configurations perform well in terms of overall average waiting time, with all lines operating well within capacity. It is expected since this is a baseline analysis under idealised steady-state conditions, where the system is not stressed by burst arrivals or high service-time variability. The M/G/k model is applied to all configurations using the pooled WAST parameters. Results show all systems are well within capacity (ρ \< 35% across all lines), with near-zero wait times.
+
+However, the fairness scores reveal important differences in how each configuration serves different user groups. Across the three configurations, the equity scores can be summarised as follows:
+
+|        Metric         | Config 1 | Config 2 | Config 3 |
+|:---------------------:|:--------:|:--------:|:--------:|
+| **Totalitarian (Tr)** |   4.82   |   4.30   |  **5**   |
+|   **Rawlsian (Mr)**   |    3     |    4     |  **5**   |
+
+Under these conditions, the fairness scores are driven entirely by access and preference match rather than wait times. Config 3 achieves perfect Tr and Mr. Config 2 with Unisex only restrooms has a lower Tr due to the lower satisfaction scores for gender-segregated preference users (majority), but a higher Mr than Config 1 because it provides better access for unisex-preference users. Config 1 has a higher Tr than Config 2 because it provides better access for the majority gender-segregated preference users, but a lower Mr than Config 2 because it provides no access for unisex-preference users.
+
+Based on the resulted equity scores, the configurations can be ranked as follows:
+
+-   Totalitarian ranking: Config 3 \> Config 1 \> Config 2
+
+-   Rawlsian ranking: Config 3 \> Config 2 \> Config 1
+
+While the baseline results establish a clear ranking under idealised conditions, real concert hall intermissions rarely conform to steady-state assumptions. Patrons tend to surge toward restrooms immediately after the performance pauses, or rush back just before it resumes. The following section examines whether the baseline ranking holds under these more realistic demand patterns.
+
+## 3.3 System Behaviour Under Surge Demand
+
+Four surge scenarios are simulated to stress-test the baseline findings. All scenarios apply a burst arrival pattern where 80% of patrons arrive within a concentrated 5-minute window, with the remaining 20% spread across the rest of the intermission. Two timing variants are tested, early burst (first 5 minutes) and late burst (last 5 minutes), each combined with two gender compositions: male-dominated and female-dominated arrivals.
+
+The gender composition scenarios reflect a practical reality of concert hall operations: audience demographics are not always balanced and are often shaped by the nature of the performance. A K-pop or idol group concert, for instance, typically attracts a predominantly female audience, while other genres may skew male. Rather than assuming a 50-50 gender split, these scenarios examine how each configuration performs when one gender accounts for 80% of total arrivals, capturing the service time variance and diverse stakeholder needs that arise from such demographic shifts.
+
+This stress test approach uses the pareto principle to create a more extreme scenario, where the majority of demand is concentrated in a short time window, and one gender dominates the arrivals. This allows us to evaluate the robustness of each configuration under conditions that are more challenging than the baseline steady-state scenario, and to see how well they can accommodate different user groups when demand is highly concentrated.
+
+|   | Early Burst (first 5 min) | Late Burst (last 5 min) |
+|----|----|----|
+| **Male-Dominant (80% Men)** | Scenario 1 | Scenario 3 |
+| **Female-Dominant (80% Women)** | Scenario 2 | Scenario 4 |
+
+### 3.3.1 Early Surge with Male-Dominated Arrivals
+
+### 3.3.2 Early Surge with Female-Dominated Arrivals
+
+### 3.3.3 Late Surge with Male-Dominated Arrivals
+
+### 3.3.4 Late Surge with Female-Dominated Arrivals
+
+## 3.4 Comparative Equity Analysis Under Surge Demand
+
+### 3.4.1 Operational performance across surge scenarios
+
+### 3.4.2 Fairness and equity scores under various surge scenarios
+
+### 3.4.3 Overall ranking and robustness analysis
+
+Average waiting time by configuration: bar chart
+
+Women vs men waiting time: gender disparity
+
+Worst-group waiting time by configuration: Direction A。
+
+Equity score comparison: preference table into equity scores
+
+Burst arrival results: table or line chart eg. queue length over time or users still waiting after 25 minutes
+
+Apply a fairness feasibility threshold: a configuration is considered unacceptable if any stakeholder group has an average waiting time greater than 15 minutes, because this represents more than half of the 25-minute intermission and would leave insufficient time for patrons to return comfortably before the performance resumes.
+
+-   Primary threshold: any group average wait \> 15 minutes is unacceptable.
+-   Secondary stress indicator: if many users remain unserved after 25 minutes, the configuration is not robust.
+
+*threshold can be adjusted, now just for example*
+
+# 4. Discussions of results and business recommendation
+
+# 5. Conclusion and further suggested work
+
+
 
 **NOT FINALISED**
 
-1. Introduction and Background
+1.  Introduction and Background
 
-   1.1 Business problem: 25-minute intermission and restroom congestion
+    1.1 Business problem: 25-minute intermission and restroom congestion
 
-   During performances, the concert hall has a strict 25-minute intermission. This short period creates a sudden rush to restroom facilities, leading to congestion and long waiting times. Management has received increasing complaints not only about queue length, but also about the lack of inclusive restroom design.
+    During performances, the concert hall has a strict 25-minute intermission. This short period creates a sudden rush to restroom facilities, leading to congestion and long waiting times. Management has received increasing complaints not only about queue length, but also about the lack of inclusive restroom design.
 
-   1.2 Why this is also a fairness and inclusivity problem
+    1.2 Why this is also a fairness and inclusivity problem
 
-   Different users have different needs and preferences. Some prefer gender-segregated facilities, some have no strong preference, and some prefer unisex facilities. Because of this, the best restroom design should not only have shorter average waiting times, but should also consider whether different user groups are treated fairly.
+    Different users have different needs and preferences. Some prefer gender-segregated facilities, some have no strong preference, and some prefer unisex facilities. Because of this, the best restroom design should not only have shorter average waiting times, but should also consider whether different user groups are treated fairly.
 
-   1.3 Report scope: Primary Direction A + secondary Direction B
+    1.3 Report scope: Primary Direction A + secondary Direction B
 
-   This report focuses primarily on **Direction A: Fairness and Stakeholder Disparity**. The three baseline configurations are compared using both waiting-time performance (Totalitarian) and preference-based equity measures (Rawlsian). As a secondary sensitivity analysis, the report also considers **Direction B: Splitting Rules**, by examining how different assumptions about no-preference users may affect the results.
-   
-   1.4 Three configurations compared
+    This report focuses primarily on **Direction A: Fairness and Stakeholder Disparity**. The three baseline configurations are compared using both waiting-time performance (Totalitarian) and preference-based equity measures (Rawlsian). As a secondary sensitivity analysis, the report also considers **Direction B: Splitting Rules**, by examining how different assumptions about no-preference users may affect the results.
 
-   The three configurations evaluated in this report are:
-  
-    1. **Status Quo**: 20 women’s stalls, 10 men’s urinals, and 10 men’s stalls.
-    2. **All Unisex**: 40 universal all-gender stalls.
-    3. **Hybrid Model**: 15 women’s stalls, 10 men’s urinals, 5 men’s stalls, and 10 unisex stalls.
+    1.4 Three configurations compared
 
-   *(If we decide to include Direction C, we can add it here and in the analysis sections below.)*
+    The three configurations evaluated in this report are:
 
-2. Analytical Methods
+    1.  **Status Quo**: 20 women’s stalls, 10 men’s urinals, and 10 men’s stalls.
+    2.  **All Unisex**: 40 universal all-gender stalls.
+    3.  **Hybrid Model**: 15 women’s stalls, 10 men’s urinals, 5 men’s stalls, and 10 unisex stalls.
 
-   2.1 Queueing model assumptions
-      - Poisson arrivals
-      - Non-Exponential / variable service times
-      - Multi-server queues
+    *(If we decide to include Direction C, we can add it here and in the analysis sections below.)*
 
-   2.2 Input parameters and stakeholder groups
+2.  Analytical Methods
 
-  | Stakeholder                         | Meaning                                    |
-  | ----------------------------------- | ------------------------------------------ |
-  | Women, gender-segregated preference | Prefer women’s facilities                  |
-  | Men, gender-segregated preference   | Prefer men’s facilities                    |
-  | No-preference users                 | Can use either gender-segregated or unisex |
-  | Unisex-preference users             | Prefer unisex facilities                   |
-  | Class 1 users                       | Shorter service time                       |
-  | Class 2 users                       | Longer service time                        |
-   
-   2.3 Direction A fairness framework
+    2.1 Queueing model assumptions
 
-      - Average wait: Efficiency
-      - Group wait: Stakeholder disparity
-      - Worst-group wait: Rawlsian fairness
-      - Equity score: Inclusive design / user satisfaction
-      - Difference between longest and shortest group wait: Inequality / disparity
-      - Totalitarian vs Rawlsian approach
-        - Totalitarian criterion: Which configuration gives the highest total welfare or lowest overall average waiting time?
-        - Rawlsian criterion: Which configuration minimises the worst stakeholder waiting time or improves the lowest equity score?
+    -   Poisson arrivals
+    -   Non-Exponential / variable service times
+    -   Multi-server queues
 
-   2.4 Direction B splitting rule sensitivity
+    2.2 Input parameters and stakeholder groups
 
-      Focus on how no-preference users are split between gender-segregated and unisex facilities, several alternative splitting rules:
-      - Baseline fixed split: No-preference users are assumed to be randomly split 50/50 between gender-segregated and unisex facilities.
-      - More GS-oriented split: No-preference users mostly follow gender-segregated facilities
-      - More unisex-oriented split: No-preference users more willing to use unisex facilities
-      - Shortest queue rule: No-preference users choose the shorter queue at the time of arrival
-      - Shortest expected wait rule: No-preference users choose the option with lower expected waiting time
+| Stakeholder | Meaning |
+|---------------------------------|---------------------------------------|
+| Women, gender-segregated preference | Prefer women’s facilities |
+| Men, gender-segregated preference | Prefer men’s facilities |
+| No-preference users | Can use either gender-segregated or unisex |
+| Unisex-preference users | Prefer unisex facilities |
+| Class 1 users | Shorter service time |
+| Class 2 users | Longer service time |
 
-    Assumption: We only apply adaptive splitting to no-preference users, while gender-segregated preference and unisex-preference users mainly follow their stated preferences.
+2.3 Direction A fairness framework
 
-   2.5 Simulation scenarios
+```         
+  - Average wait: Efficiency
+  - Group wait: Stakeholder disparity
+  - Worst-group wait: Rawlsian fairness
+  - Equity score: Inclusive design / user satisfaction
+  - Difference between longest and shortest group wait: Inequality / disparity
+  - Totalitarian vs Rawlsian approach
+    - Totalitarian criterion: Which configuration gives the highest total welfare or lowest overall average waiting time?
+    - Rawlsian criterion: Which configuration minimises the worst stakeholder waiting time or improves the lowest equity score?
+```
 
-   The simulation is used to test whether the analytical queueing results remain reliable under more realistic intermission conditions. In particular, the simulation considers three scenarios:
-    - Baseline: Based on the historical arrival and service-time parameters provided in the case, the simulation assumes that arrivals follow the baseline stochastic process and that users follow the initial splitting rule. (As the normal intermission scenario to think which configuration performs best under typical conditions.)
-    - Burst arrival: 80% arrive in first 5 minutes (To stress-test the restroom system under a realistic intermission rush scenario, where many users arrive at the same time. Which configuration is most robust when demand is highly concentrated at the beginning of the intermission?)
-    - Higher service-time variance: The baseline service-time distribution may underestimate the diversity of user needs. Some users may require more time due to accessibility needs, caregiving responsibilities, clothing, mobility limitations, or other personal factors. Therefore, this scenario increases the variability of service times while keeping the same basic arrival structure. (To test whether the recommended configuration remains fair when service times are more unequal. Which configuration is less sensitive to service-time variability?) <- Important for fairness because a system that only works well when most users have short service times may not be inclusive.
-    
-    Metric:
+2.4 Direction B splitting rule sensitivity
 
-    mean wait - Average waiting time across users: overall efficiency
-    median wait - Typical user's wating time: less sensitive to outliers than mean
-    90th percentile wait - Waiting time experienced by the worst 10% of users: measures fairness and congestion risk
-    maximum wait - Longest waiting time experienced by any user: extreme congestion risk
-    **percentage of users served within 25 minutes** - percentage of users who complete restroom use during intermission: measures whether the system can handle demand within the time constraints of the intermission
-    number of users still waiting at end of intermission - Number of users not served before performance resumes: operational failure
+```         
+  Focus on how no-preference users are split between gender-segregated and unisex facilities, several alternative splitting rules:
+  - Baseline fixed split: No-preference users are assumed to be randomly split 50/50 between gender-segregated and unisex facilities.
+  - More GS-oriented split: No-preference users mostly follow gender-segregated facilities
+  - More unisex-oriented split: No-preference users more willing to use unisex facilities
+  - Shortest queue rule: No-preference users choose the shorter queue at the time of arrival
+  - Shortest expected wait rule: No-preference users choose the option with lower expected waiting time
 
-3. Results
+Assumption: We only apply adaptive splitting to no-preference users, while gender-segregated preference and unisex-preference users mainly follow their stated preferences.
+```
 
-   3.1 Parameter table
+2.5 Simulation scenarios
 
-   3.2 Analytical waiting-time results
+The simulation is used to test whether the analytical queueing results remain reliable under more realistic intermission conditions. In particular, the simulation considers three scenarios: - Baseline: Based on the historical arrival and service-time parameters provided in the case, the simulation assumes that arrivals follow the baseline stochastic process and that users follow the initial splitting rule. (As the normal intermission scenario to think which configuration performs best under typical conditions.) - Burst arrival: 80% arrive in first 5 minutes (To stress-test the restroom system under a realistic intermission rush scenario, where many users arrive at the same time. Which configuration is most robust when demand is highly concentrated at the beginning of the intermission?) - Higher service-time variance: The baseline service-time distribution may underestimate the diversity of user needs. Some users may require more time due to accessibility needs, caregiving responsibilities, clothing, mobility limitations, or other personal factors. Therefore, this scenario increases the variability of service times while keeping the same basic arrival structure. (To test whether the recommended configuration remains fair when service times are more unequal. Which configuration is less sensitive to service-time variability?) \<- Important for fairness because a system that only works well when most users have short service times may not be inclusive.
 
-   3.3 Simulation results
-   
-   3.4 Fairness and equity-score results
-   
-   3.5 Burst-arrival stress test
-   
-   3.6 Direction B sensitivity results
+```         
+Metric:
 
-  Average waiting time by configuration: bar chart
-  
-  Women vs men waiting time: gender disparity
-  
-  Worst-group waiting time by configuration: Direction A。
-  
-  Equity score comparison: preference table into equity scores
-  
-  Burst arrival results: table or line chart eg. queue length over time or users still 
-  waiting after 25 minutes
+mean wait - Average waiting time across users: overall efficiency
+median wait - Typical user's wating time: less sensitive to outliers than mean
+90th percentile wait - Waiting time experienced by the worst 10% of users: measures fairness and congestion risk
+maximum wait - Longest waiting time experienced by any user: extreme congestion risk
+**percentage of users served within 25 minutes** - percentage of users who complete restroom use during intermission: measures whether the system can handle demand within the time constraints of the intermission
+number of users still waiting at end of intermission - Number of users not served before performance resumes: operational failure
+```
 
-  Apply a fairness feasibility threshold: a configuration is considered unacceptable if any stakeholder group has an average waiting time greater than 15 minutes, because this represents more than half of the 25-minute intermission and would leave insufficient time for patrons to return comfortably before the performance resumes.
 
-  - Primary threshold: any group average wait > 15 minutes is unacceptable. 
-  - Secondary stress indicator: if many users remain unserved after 25 minutes, the configuration is not robust.
-  
-  *threshold can be adjusted, now just for example*
+```         
+3.2 Analytical waiting-time results
 
-4. Discussion and Business Recommendation (Example)
-  
-   4.1 Efficiency comparison
+3.3 Simulation results
 
-   In terms of overall average waiting time, Configuration X performs best, followed by Configuration Y and Z.
+3.4 Fairness and equity-score results
 
-   4.2 Fairness comparison
+3.5 Burst-arrival stress test
 
-   Although a configuration may be efficient on average, it may still be unacceptable if one stakeholder group experiences a substantially longer waiting time.
+3.6 Direction B sensitivity results
 
-   4.3 Apply decision threshold
-       - Reject configurations where any group average wait > 15 minutes
+Average waiting time by configuration: bar chart
 
-  | Criterion    | Meaning                                               |
-  | ------------ | ----------------------------------------------------- |
-  | Efficiency   | Overall average wait should be low                    |
-  | Fairness     | Worst-group wait should not exceed threshold          |
-  | Inclusivity  | Unisex-preference users should have reasonable access |
-  | Robustness   | Performance should not collapse under burst arrival   |
-  | Practicality | Configuration should be operationally feasible        |
+Women vs men waiting time: gender disparity
 
-   If a configuration has a lowest avg waiting time, but one group has an average wait of 15 minutes, it would be rejected based on the fairness criterion. If a configuration considered as fair but collapses under burst arrival, it would be rejected based on the robustness criterion. If a configuration is efficient and fair, but has no unisex access, it would be rejected based on the inclusivity criterion. The final recommendation should be the configuration that best balances these criteria.
+Worst-group waiting time by configuration: Direction A。
 
-   4.4 Discuss inclusivity and unisex access
+Equity score comparison: preference table into equity scores
 
-   Unisex facilities provide flexibility and support inclusive access, especially for users who prefer or require all-gender facilities. However, if unisex capacity is too small, these users may experience long queues and low equity scores. Therefore, the recommendation should consider both the number of unisex units and how users are directed to them during peak demand.
+Burst arrival results: table or line chart eg. queue length over time or users still waiting after 25 minutes
 
-   The conclusion is also tested under alternative splitting rules. If no-preference users are willing to move toward the shorter queue, the Hybrid Model may perform better because unisex stalls can absorb overflow demand. However, this depends on clear signage and user awareness.
-   
-   4.5 Recommend final configuration
-   
-   4.6 Explain why other options are not selected
-  
-  What does it mean for management, and what should they do?
-   
+Apply a fairness feasibility threshold: a configuration is considered unacceptable if any stakeholder group has an average waiting time greater than 15 minutes, because this represents more than half of the 25-minute intermission and would leave insufficient time for patrons to return comfortably before the performance resumes.
 
-5. Conclusion and Further Suggested Work: Summarise final recommendation and acknowledge limitations.
-   
-   5.1 Final summary of recommendation
+-   Primary threshold: any group average wait \> 15 minutes is unacceptable.
+-   Secondary stress indicator: if many users remain unserved after 25 minutes, the configuration is not robust.
 
-   Based on the combined evaluation of waiting-time performance, stakeholder disparity, equity scores, and burst-arrival robustness, this report recommends **Configuration X** as the preferred design. The optimal configuration does not mean it is perfect in every aspect, but it avoids having any stakeholder group experiencing an average wait time greater than 15 minutes, while also providing reasonable access for unisex-preference users and maintaining robustness under burst arrival conditions.
+*threshold can be adjusted, now just for example*
+```
 
-   5.2 Main limitations
-   
-   5.3 Further work
-       - More real data: Improve accuracy of arrival assumptions
-       - Cost analysis: Assess feasibility of redesign
-       - Different event types: Audience behaviour may differ by concert type
-       - More behavioural split rules: Better represent real user decisions
-       - Accessibility and sustainability considerations: Consider how design affects users with disabilities and environmental impact of different configurations
+4.  Discussion and Business Recommendation (Example)
 
-6. Appendix
-   - Code
-   - Full simulation details
-   - Extra tables/figures
-   - References
+    4.1 Efficiency comparison
+
+    In terms of overall average waiting time, Configuration X performs best, followed by Configuration Y and Z.
+
+    4.2 Fairness comparison
+
+    Although a configuration may be efficient on average, it may still be unacceptable if one stakeholder group experiences a substantially longer waiting time.
+
+    4.3 Apply decision threshold - Reject configurations where any group average wait \> 15 minutes
+
+| Criterion    | Meaning                                               |
+|--------------|-------------------------------------------------------|
+| Efficiency   | Overall average wait should be low                    |
+| Fairness     | Worst-group wait should not exceed threshold          |
+| Inclusivity  | Unisex-preference users should have reasonable access |
+| Robustness   | Performance should not collapse under burst arrival   |
+| Practicality | Configuration should be operationally feasible        |
+
+If a configuration has a lowest avg waiting time, but one group has an average wait of 15 minutes, it would be rejected based on the fairness criterion. If a configuration considered as fair but collapses under burst arrival, it would be rejected based on the robustness criterion. If a configuration is efficient and fair, but has no unisex access, it would be rejected based on the inclusivity criterion. The final recommendation should be the configuration that best balances these criteria.
+
+4.4 Discuss inclusivity and unisex access
+
+Unisex facilities provide flexibility and support inclusive access, especially for users who prefer or require all-gender facilities. However, if unisex capacity is too small, these users may experience long queues and low equity scores. Therefore, the recommendation should consider both the number of unisex units and how users are directed to them during peak demand.
+
+The conclusion is also tested under alternative splitting rules. If no-preference users are willing to move toward the shorter queue, the Hybrid Model may perform better because unisex stalls can absorb overflow demand. However, this depends on clear signage and user awareness.
+
+4.5 Recommend final configuration
+
+4.6 Explain why other options are not selected
+
+What does it mean for management, and what should they do?
+
+5.  Conclusion and Further Suggested Work: Summarise final recommendation and acknowledge limitations.
+
+    5.1 Final summary of recommendation
+
+    Based on the combined evaluation of waiting-time performance, stakeholder disparity, equity scores, and burst-arrival robustness, this report recommends **Configuration X** as the preferred design. The optimal configuration does not mean it is perfect in every aspect, but it avoids having any stakeholder group experiencing an average wait time greater than 15 minutes, while also providing reasonable access for unisex-preference users and maintaining robustness under burst arrival conditions.
+
+    5.2 Main limitations
+
+    5.3 Further work - More real data: Improve accuracy of arrival assumptions - Cost analysis: Assess feasibility of redesign - Different event types: Audience behaviour may differ by concert type - More behavioural split rules: Better represent real user decisions - Accessibility and sustainability considerations: Consider how design affects users with disabilities and environmental impact of different configurations
+
+6.  Appendix
+
+    -   Code
+    -   Full simulation details
+    -   Extra tables/figures
+    -   References
