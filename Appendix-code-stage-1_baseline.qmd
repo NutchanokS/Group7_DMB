@@ -1,0 +1,582 @@
+---
+title: "Stage 1 Baseline Results (M/G/k)"
+format: pdf
+toc: true
+---
+
+## Input Data
+
+```{r}
+# -----------------------------
+# Input data
+# -----------------------------
+
+# Women
+prob_women_class2    <- 0.05
+total_arrival_women  <- 3.2
+arrival_women_class1 <- (1 - prob_women_class2) * total_arrival_women
+arrival_women_class2 <- prob_women_class2 * total_arrival_women
+service_sigma_women_class1 <- 1.2
+service_sigma_women_class2 <- 3.2
+service_mean_women_class1  <- 1.67
+service_mean_women_class2  <- 5.2
+
+# Men
+prob_men_class2    <- 0.05
+total_arrival_men  <- 3.2
+arrival_men_class1 <- (1 - prob_men_class2) * total_arrival_men
+arrival_men_class2 <- prob_men_class2 * total_arrival_men
+service_sigma_men_class1 <- 0.7
+service_sigma_men_class2 <- 3.2
+service_mean_men_class1  <- 0.83
+service_mean_men_class2  <- 5.2
+
+# User preferences 
+women_pref_GS      <- 0.70
+women_with_no_pref <- 0.21
+women_pref_unisex  <- 0.09
+men_pref_GS        <- 0.70
+men_with_no_pref   <- 0.21
+men_pref_unisex    <- 0.09
+
+# Routing assumption: 50-50 split for no-preference users
+perc_women_no_pref_go_to_GS <- 0.5
+perc_men_no_pref_go_to_GS   <- 0.5
+```
+
+## Functions
+
+```{r}
+# -----------------------------
+# Functions
+# -----------------------------
+WAST_computation_general <- function(n, sigma, AST) {
+  total_N <- sum(n)
+  p_all <- sum(n * AST) / total_N
+  variance_terms <- n * (sigma^2 + (AST - p_all)^2)
+  sigma_all <- sqrt(sum(variance_terms) / total_N)
+  list(mean = p_all, sigma = sigma_all)
+}
+
+calculate_ggk_metrics <- function(arrival_rate, service_rate, k, cv_arrival, cv_service) {
+  rho <- arrival_rate / (k * service_rate)
+
+  if (rho >= 1) {
+    return("System is unstable (Utilization >= 100%)")
+  }
+
+  E_s       <- 1 / service_rate
+  prob_wait <- rho^(sqrt(2 * (k + 1)) - 1)
+
+  ca_sq <- cv_arrival^2
+  cs_sq <- cv_service^2
+
+  Wq <- ((ca_sq + cs_sq) / 2) * (prob_wait / (k * (1 - rho))) * E_s
+  W  <- Wq + E_s
+  Lq <- arrival_rate * Wq
+  L  <- arrival_rate * W
+
+  list(
+    `Utilization (rho)`            = sprintf("%.2f%%", rho * 100),
+    `Pr{Wait > 0}`                 = sprintf("%.6f",   prob_wait),
+    `Avg Customers in Queue (Lq)`  = round(Lq, 6),
+    `Avg Customers in System (L)`  = round(L,  4),
+    `Avg Wait Time in Queue (Wq)`  = round(Wq, 8),
+    `Avg Total Time in System (W)` = round(W,  4)
+  )
+}
+
+print_stats <- function(title, stats) {
+  cat("-----------------------------\n")
+  cat(title, "\n")
+  if (is.character(stats)) {
+    cat(stats, "\n")
+  } else {
+    for (nm in names(stats)) {
+      cat(nm, ":", stats[[nm]], "\n")
+    }
+  }
+}
+
+score_table <- data.frame(
+  wait = c(
+    rep(0, 12), rep(5, 12), rep(10, 12), rep(20, 12), rep(40, 12)
+  ),
+  gender = c(
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M"
+  ),
+  pref = c(
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX"
+  ),
+  uses = c(
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX"
+  ),
+  score = c(
+    5,4,5,5,3,5,5,4,5,5,3,5,
+    4,3,4,4,2,4,4,3,4,4,2,4,
+    3,2,2,2,1,3,3,2,2,2,1,3,
+    1,1,1,1,0,2,2,0,1,1,0,2,
+    0,0,0,0,0,1,0,0,0,0,0,1
+  ),
+  stringsAsFactors = FALSE
+)
+
+get_score <- function(wait, gender, pref, uses) {
+  valid_waits <- c(0, 5, 10, 20, 40)
+  lower_waits <- valid_waits[valid_waits <= wait]
+  actual_wait <- if (length(lower_waits) == 0) 0 else max(lower_waits)
+
+  row <- score_table[
+    score_table$wait   == actual_wait &
+    score_table$gender == gender      &
+    score_table$pref   == pref        &
+    score_table$uses   == uses,
+  ]
+
+  if (nrow(row) == 0) return(0)
+  row$score[1]
+}
+```
+
+## Config 1 — Status Quo (20W + 10 Men Urinals + 10 Men Stalls)
+
+Config 1 is the status quo with no unisex stalls. All users are routed
+to gender-segregated restrooms. Women's stalls serve both Class 1 and
+Class 2, requiring WAST pooling. Men's urinals and stalls serve single
+classes only.
+
+```{r}
+# -----------------------------
+# Config 1 — WAST
+# -----------------------------
+
+# Women's stalls: pool Class 1 and Class 2
+res_women_c1 <- WAST_computation_general(
+  n     = c(arrival_women_class1, arrival_women_class2),
+  sigma = c(service_sigma_women_class1, service_sigma_women_class2),
+  AST   = c(service_mean_women_class1,  service_mean_women_class2)
+)
+service_mean_all_women_c1  <- res_women_c1$mean
+service_sigma_all_women_c1 <- res_women_c1$sigma
+cv_women_c1 <- service_sigma_all_women_c1 / service_mean_all_women_c1
+
+# Men's urinals: Class 1 only — no pooling needed
+cv_men_class1 <- service_sigma_men_class1 / service_mean_men_class1
+
+# Men's stalls: Class 2 only — no pooling needed
+cv_men_class2 <- service_sigma_men_class2 / service_mean_men_class2
+
+cat("Config 1 — WAST\n")
+cat("Women stalls : mean =", round(service_mean_all_women_c1, 4),
+    " sigma =", round(service_sigma_all_women_c1, 4),
+    " CV =", round(cv_women_c1, 4), "\n")
+cat("Men urinals  : mean =", service_mean_men_class1,
+    " sigma =", service_sigma_men_class1,
+    " CV =", round(cv_men_class1, 4), "\n")
+cat("Men stalls   : mean =", service_mean_men_class2,
+    " sigma =", service_sigma_men_class2,
+    " CV =", round(cv_men_class2, 4), "\n")
+```
+
+```{r}
+# -----------------------------
+# Config 1 — Queuing Metrics
+# -----------------------------
+
+# Women's stalls (k = 20)
+womens_stats_c1 <- calculate_ggk_metrics(
+  arrival_rate = total_arrival_women,
+  service_rate = 1 / service_mean_all_women_c1,
+  k            = 20,
+  cv_arrival   = 1.0,
+  cv_service   = cv_women_c1
+)
+
+# Men's urinals (k = 10, Class 1 only)
+mens_class1_stats_c1 <- calculate_ggk_metrics(
+  arrival_rate = arrival_men_class1,
+  service_rate = 1 / service_mean_men_class1,
+  k            = 10,
+  cv_arrival   = 1.0,
+  cv_service   = cv_men_class1
+)
+
+# Men's stalls (k = 10, Class 2 only)
+mens_class2_stats_c1 <- calculate_ggk_metrics(
+  arrival_rate = arrival_men_class2,
+  service_rate = 1 / service_mean_men_class2,
+  k            = 10,
+  cv_arrival   = 1.0,
+  cv_service   = cv_men_class2
+)
+
+cat("Config 1 — Queuing Metrics\n")
+print_stats("Women's stalls   (k=20)", womens_stats_c1)
+print_stats("Men's urinals    (k=10)", mens_class1_stats_c1)
+print_stats("Men's stalls     (k=10)", mens_class2_stats_c1)
+```
+
+```{r}
+# -----------------------------
+# Config 1 — Fairness Scores
+# All users routed to GS (no unisex available)
+# -----------------------------
+wq_women_c1      <- womens_stats_c1$`Avg Wait Time in Queue (Wq)`
+wq_men_class1_c1 <- mens_class1_stats_c1$`Avg Wait Time in Queue (Wq)`
+wq_men_class2_c1 <- mens_class2_stats_c1$`Avg Wait Time in Queue (Wq)`
+
+average_totalitarian_c1 <- (
+  total_arrival_women * women_pref_GS      * get_score(wq_women_c1,      "W", "GS", "GS") +
+  total_arrival_women * women_with_no_pref * get_score(wq_women_c1,      "W", "NP", "GS") +
+  total_arrival_women * women_pref_unisex  * get_score(wq_women_c1,      "W", "UX", "GS") +
+  arrival_men_class1  * men_pref_GS        * get_score(wq_men_class1_c1, "M", "GS", "GS") +
+  arrival_men_class1  * men_with_no_pref   * get_score(wq_men_class1_c1, "M", "NP", "GS") +
+  arrival_men_class1  * men_pref_unisex    * get_score(wq_men_class1_c1, "M", "UX", "GS") +
+  arrival_men_class2  * men_pref_GS        * get_score(wq_men_class2_c1, "M", "GS", "GS") +
+  arrival_men_class2  * men_with_no_pref   * get_score(wq_men_class2_c1, "M", "NP", "GS") +
+  arrival_men_class2  * men_pref_unisex    * get_score(wq_men_class2_c1, "M", "UX", "GS")
+) / (total_arrival_women + total_arrival_men)
+
+all_scores_c1 <- c(
+  get_score(wq_women_c1,      "W", "GS", "GS"),
+  get_score(wq_women_c1,      "W", "NP", "GS"),
+  get_score(wq_women_c1,      "W", "UX", "GS"),
+  get_score(wq_men_class1_c1, "M", "GS", "GS"),
+  get_score(wq_men_class1_c1, "M", "NP", "GS"),
+  get_score(wq_men_class1_c1, "M", "UX", "GS"),
+  get_score(wq_men_class2_c1, "M", "GS", "GS"),
+  get_score(wq_men_class2_c1, "M", "NP", "GS"),
+  get_score(wq_men_class2_c1, "M", "UX", "GS")
+)
+rawlsian_c1 <- min(all_scores_c1)
+
+cat("Config 1 — Fairness Scores\n")
+cat(sprintf("Totalitarian (Tr) = %.4f\n", average_totalitarian_c1))
+cat(sprintf("Rawlsian     (Mr) = %.4f\n", rawlsian_c1))
+cat("Individual scores:", all_scores_c1, "\n")
+cat("Worst-off group score:", rawlsian_c1,
+    "— UX-preference users forced into GS\n")
+```
+
+## Config 2 — All Unisex (40 UX)
+
+Config 2 converts all 40 fixtures to unisex stalls. All four streams
+(W-C1, W-C2, M-C1, M-C2) share one pooled queue. GS-preference users
+are into unisex.
+
+```{r}
+# -----------------------------
+# Config 2 — WAST
+# Pool all 4 streams into one
+# -----------------------------
+sample_sizes_c2 <- c(
+  arrival_women_class1,
+  arrival_women_class2,
+  arrival_men_class1,
+  arrival_men_class2
+)
+sigmas_c2 <- c(
+  service_sigma_women_class1,
+  service_sigma_women_class2,
+  service_sigma_men_class1,
+  service_sigma_men_class2
+)
+ASTs_c2 <- c(
+  service_mean_women_class1,
+  service_mean_women_class2,
+  service_mean_men_class1,
+  service_mean_men_class2
+)
+
+res_unisex_c2 <- WAST_computation_general(sample_sizes_c2, sigmas_c2, ASTs_c2)
+service_mean_unisex_c2  <- res_unisex_c2$mean
+service_sigma_unisex_c2 <- res_unisex_c2$sigma
+cv_unisex_c2 <- service_sigma_unisex_c2 / service_mean_unisex_c2
+
+cat("Config 2 — WAST (all 4 streams pooled)\n")
+cat("Unisex stalls : mean =", round(service_mean_unisex_c2, 4),
+    " sigma =", round(service_sigma_unisex_c2, 4),
+    " CV =", round(cv_unisex_c2, 4), "\n")
+cat("Note: CV > 1 — pooling fast (men C1, AST=0.83) and slow (C2, AST=5.2)",
+    "creates wider spread than exponential\n")
+```
+
+```{r}
+# -----------------------------
+# Config 2 — Queuing Metrics
+# One line only (k = 40)
+# -----------------------------
+unisex_stats_c2 <- calculate_ggk_metrics(
+  arrival_rate = sum(sample_sizes_c2),
+  service_rate = 1 / service_mean_unisex_c2,
+  k            = 40,
+  cv_arrival   = 1.0,
+  cv_service   = cv_unisex_c2
+)
+
+cat("Config 2 — Queuing Metrics\n")
+print_stats("Unisex stalls (k=40)", unisex_stats_c2)
+```
+
+```{r}
+# -----------------------------
+# Config 2 — Fairness Scores
+# All users go to UX (only option)
+# -----------------------------
+wq_unisex_c2 <- unisex_stats_c2$`Avg Wait Time in Queue (Wq)`
+
+average_totalitarian_c2 <- (
+  total_arrival_women * women_pref_GS      * get_score(wq_unisex_c2, "W", "GS", "UX") +
+  total_arrival_women * women_with_no_pref * get_score(wq_unisex_c2, "W", "NP", "UX") +
+  total_arrival_women * women_pref_unisex  * get_score(wq_unisex_c2, "W", "UX", "UX") +
+  arrival_men_class1  * men_pref_GS        * get_score(wq_unisex_c2, "M", "GS", "UX") +
+  arrival_men_class1  * men_with_no_pref   * get_score(wq_unisex_c2, "M", "NP", "UX") +
+  arrival_men_class1  * men_pref_unisex    * get_score(wq_unisex_c2, "M", "UX", "UX") +
+  arrival_men_class2  * men_pref_GS        * get_score(wq_unisex_c2, "M", "GS", "UX") +
+  arrival_men_class2  * men_with_no_pref   * get_score(wq_unisex_c2, "M", "NP", "UX") +
+  arrival_men_class2  * men_pref_unisex    * get_score(wq_unisex_c2, "M", "UX", "UX")
+) / (total_arrival_women + total_arrival_men)
+
+all_scores_c2 <- c(
+  get_score(wq_unisex_c2, "W", "GS", "UX"),
+  get_score(wq_unisex_c2, "W", "NP", "UX"),
+  get_score(wq_unisex_c2, "W", "UX", "UX"),
+  get_score(wq_unisex_c2, "M", "GS", "UX"),
+  get_score(wq_unisex_c2, "M", "NP", "UX"),
+  get_score(wq_unisex_c2, "M", "UX", "UX")
+)
+rawlsian_c2 <- min(all_scores_c2)
+
+cat("Config 2 — Fairness Scores\n")
+cat(sprintf("Totalitarian (Tr) = %.4f\n", average_totalitarian_c2))
+cat(sprintf("Rawlsian     (Mr) = %.4f\n", rawlsian_c2))
+cat("Individual scores:", all_scores_c2, "\n")
+cat("Worst-off group score:", rawlsian_c2,
+    "— GS-preference users (70%) forced into UX\n")
+```
+
+## Config 3 — Hybrid (15W + 10 Men Urinals + 5 Men Stalls + 10 UX)
+
+Config 3 introduces 10 unisex stalls alongside gender-segregated ones.
+GS route: 80.5% of each gender (70% GS-pref + 50% x 21% no-pref).
+Unisex route: 19.5% of each gender (9% UX-pref + 50% x 21% no-pref).
+
+```{r}
+# -----------------------------
+# Config 3 — Arrival Allocation
+# -----------------------------
+gs_route   <- women_pref_GS + perc_women_no_pref_go_to_GS * women_with_no_pref  # 0.805
+ux_route   <- women_pref_unisex + (1 - perc_women_no_pref_go_to_GS) * women_with_no_pref  # 0.195
+
+# Women GS route
+arrival_women_class1_gs_c3 <- total_arrival_women * (1 - prob_women_class2) * gs_route
+arrival_women_class2_gs_c3 <- total_arrival_women * prob_women_class2 * gs_route
+
+# Men GS route
+arrival_men_class1_gs_c3   <- total_arrival_men * (1 - prob_men_class2) * gs_route
+arrival_men_class2_gs_c3   <- total_arrival_men * prob_men_class2 * gs_route
+
+# Unisex route (all 4 streams)
+arrival_women_class1_ux_c3 <- total_arrival_women * (1 - prob_women_class2) * ux_route
+arrival_women_class2_ux_c3 <- total_arrival_women * prob_women_class2 * ux_route
+arrival_men_class1_ux_c3   <- total_arrival_men * (1 - prob_men_class2) * ux_route
+arrival_men_class2_ux_c3   <- total_arrival_men * prob_men_class2 * ux_route
+
+cat("Config 3 — Arrival Allocation\n")
+cat("GS route proportion  :", gs_route, "\n")
+cat("UX route proportion  :", ux_route, "\n")
+cat("Women GS total lambda:", arrival_women_class1_gs_c3 + arrival_women_class2_gs_c3, "\n")
+cat("Men GS total lambda  :", arrival_men_class1_gs_c3   + arrival_men_class2_gs_c3,   "\n")
+cat("Unisex total lambda  :", arrival_women_class1_ux_c3 + arrival_women_class2_ux_c3 +
+                              arrival_men_class1_ux_c3   + arrival_men_class2_ux_c3,   "\n")
+```
+
+```{r}
+# -----------------------------
+# Config 3 — WAST
+# Women's stalls: same pool as Config 1 (ratio preserved)
+# Unisex stalls:  same pool as Config 2 (ratio preserved)
+# Men's urinals and stalls: single class — no pooling
+# -----------------------------
+
+# Women's stalls
+res_women_c3 <- WAST_computation_general(
+  n     = c(arrival_women_class1_gs_c3, arrival_women_class2_gs_c3),
+  sigma = c(service_sigma_women_class1,  service_sigma_women_class2),
+  AST   = c(service_mean_women_class1,   service_mean_women_class2)
+)
+service_mean_all_women_c3  <- res_women_c3$mean
+service_sigma_all_women_c3 <- res_women_c3$sigma
+cv_women_c3 <- service_sigma_all_women_c3 / service_mean_all_women_c3
+
+# Unisex stalls: pool all 4 streams
+sample_sizes_ux_c3 <- c(
+  arrival_women_class1_ux_c3, arrival_women_class2_ux_c3,
+  arrival_men_class1_ux_c3,   arrival_men_class2_ux_c3
+)
+sigmas_ux_c3 <- c(
+  service_sigma_women_class1, service_sigma_women_class2,
+  service_sigma_men_class1,   service_sigma_men_class2
+)
+ASTs_ux_c3 <- c(
+  service_mean_women_class1, service_mean_women_class2,
+  service_mean_men_class1,   service_mean_men_class2
+)
+res_unisex_c3 <- WAST_computation_general(sample_sizes_ux_c3, sigmas_ux_c3, ASTs_ux_c3)
+service_mean_unisex_c3  <- res_unisex_c3$mean
+service_sigma_unisex_c3 <- res_unisex_c3$sigma
+cv_unisex_c3 <- service_sigma_unisex_c3 / service_mean_unisex_c3
+
+cat("Config 3 — WAST\n")
+cat("Women's stalls : mean =", round(service_mean_all_women_c3, 4),
+    " CV =", round(cv_women_c3, 4), "\n")
+cat("Men's urinals  : mean =", service_mean_men_class1,
+    " CV =", round(cv_men_class1, 4), "\n")
+cat("Men's stalls   : mean =", service_mean_men_class2,
+    " CV =", round(cv_men_class2, 4), "\n")
+cat("Unisex stalls  : mean =", round(service_mean_unisex_c3, 4),
+    " CV =", round(cv_unisex_c3, 4), "\n")
+```
+
+```{r}
+# -----------------------------
+# Config 3 — Queuing Metrics
+# -----------------------------
+
+# Women's stalls (k = 15)
+womens_stats_c3 <- calculate_ggk_metrics(
+  arrival_rate = arrival_women_class1_gs_c3 + arrival_women_class2_gs_c3,
+  service_rate = 1 / service_mean_all_women_c3,
+  k            = 15,
+  cv_arrival   = 1.0,
+  cv_service   = cv_women_c3
+)
+
+# Men's urinals (k = 10, Class 1 GS route)
+mens_class1_stats_c3 <- calculate_ggk_metrics(
+  arrival_rate = arrival_men_class1_gs_c3,
+  service_rate = 1 / service_mean_men_class1,
+  k            = 10,
+  cv_arrival   = 1.0,
+  cv_service   = cv_men_class1
+)
+
+# Men's stalls (k = 5, Class 2 GS route)
+mens_class2_stats_c3 <- calculate_ggk_metrics(
+  arrival_rate = arrival_men_class2_gs_c3,
+  service_rate = 1 / service_mean_men_class2,
+  k            = 5,
+  cv_arrival   = 1.0,
+  cv_service   = cv_men_class2
+)
+
+# Unisex stalls (k = 10)
+unisex_stats_c3 <- calculate_ggk_metrics(
+  arrival_rate = sum(sample_sizes_ux_c3),
+  service_rate = 1 / service_mean_unisex_c3,
+  k            = 10,
+  cv_arrival   = 1.0,
+  cv_service   = cv_unisex_c3
+)
+
+cat("Config 3 — Queuing Metrics\n")
+print_stats("Women's stalls (k=15)", womens_stats_c3)
+print_stats("Men's urinals  (k=10)", mens_class1_stats_c3)
+print_stats("Men's stalls   (k=5)",  mens_class2_stats_c3)
+print_stats("Unisex stalls  (k=10)", unisex_stats_c3)
+```
+
+```{r}
+# -----------------------------
+# Config 3 — Fairness Scores
+# GS-pref to GS, UX-pref to UX
+# No-pref: 50% to GS, 50% to UX
+# -----------------------------
+wq_women_gs_c3  <- womens_stats_c3$`Avg Wait Time in Queue (Wq)`
+wq_men_ur_c3    <- mens_class1_stats_c3$`Avg Wait Time in Queue (Wq)`
+wq_men_st_c3    <- mens_class2_stats_c3$`Avg Wait Time in Queue (Wq)`
+wq_unisex_c3    <- unisex_stats_c3$`Avg Wait Time in Queue (Wq)`
+
+average_totalitarian_c3 <- (
+  # Women GS route
+  total_arrival_women * women_pref_GS      * get_score(wq_women_gs_c3, "W", "GS", "GS") +
+  total_arrival_women * women_with_no_pref * perc_women_no_pref_go_to_GS *
+                        get_score(wq_women_gs_c3, "W", "NP", "GS") +
+  # Women UX route
+  total_arrival_women * women_with_no_pref * (1 - perc_women_no_pref_go_to_GS) *
+                        get_score(wq_unisex_c3, "W", "NP", "UX") +
+  total_arrival_women * women_pref_unisex  * get_score(wq_unisex_c3, "W", "UX", "UX") +
+  # Men GS route (urinals - Class 1)
+  arrival_men_class1  * men_pref_GS        * get_score(wq_men_ur_c3, "M", "GS", "GS") +
+  arrival_men_class1  * men_with_no_pref   * perc_men_no_pref_go_to_GS *
+                        get_score(wq_men_ur_c3, "M", "NP", "GS") +
+  # Men GS route (stalls - Class 2)
+  arrival_men_class2  * men_pref_GS        * get_score(wq_men_st_c3, "M", "GS", "GS") +
+  arrival_men_class2  * men_with_no_pref   * perc_men_no_pref_go_to_GS *
+                        get_score(wq_men_st_c3, "M", "NP", "GS") +
+  # Men UX route (Class 1)
+  arrival_men_class1  * men_with_no_pref   * (1 - perc_men_no_pref_go_to_GS) *
+                        get_score(wq_unisex_c3, "M", "NP", "UX") +
+  arrival_men_class1  * men_pref_unisex    * get_score(wq_unisex_c3, "M", "UX", "UX") +
+  # Men UX route (Class 2)
+  arrival_men_class2  * men_with_no_pref   * (1 - perc_men_no_pref_go_to_GS) *
+                        get_score(wq_unisex_c3, "M", "NP", "UX") +
+  arrival_men_class2  * men_pref_unisex    * get_score(wq_unisex_c3, "M", "UX", "UX")
+) / (total_arrival_women + total_arrival_men)
+
+all_scores_c3 <- c(
+  get_score(wq_women_gs_c3, "W", "GS", "GS"),
+  get_score(wq_women_gs_c3, "W", "NP", "GS"),
+  get_score(wq_unisex_c3,   "W", "NP", "UX"),
+  get_score(wq_unisex_c3,   "W", "UX", "UX"),
+  get_score(wq_men_ur_c3,   "M", "GS", "GS"),
+  get_score(wq_men_ur_c3,   "M", "NP", "GS"),
+  get_score(wq_men_st_c3,   "M", "GS", "GS"),
+  get_score(wq_men_st_c3,   "M", "NP", "GS"),
+  get_score(wq_unisex_c3,   "M", "NP", "UX"),
+  get_score(wq_unisex_c3,   "M", "UX", "UX")
+)
+rawlsian_c3 <- min(all_scores_c3)
+
+cat("Config 3 — Fairness Scores\n")
+cat(sprintf("Totalitarian (Tr) = %.4f\n", average_totalitarian_c3))
+cat(sprintf("Rawlsian     (Mr) = %.4f\n", rawlsian_c3))
+cat("Individual scores:", all_scores_c3, "\n")
+```
+
+## Cross-Configuration Comparison
+
+```{r}
+# -----------------------------
+# Cross-configuration summary
+# -----------------------------
+cat("=== Cross-Configuration Comparison ===\n\n")
+cat(sprintf("%-30s  Config 1  Config 2  Config 3\n", "Metric"))
+cat(sprintf("%-30s  --------  --------  --------\n", ""))
+cat(sprintf("%-30s  %8.4f  %8.4f  %8.4f\n",
+    "Totalitarian (Tr)",
+    average_totalitarian_c1,
+    average_totalitarian_c2,
+    average_totalitarian_c3))
+cat(sprintf("%-30s  %8.4f  %8.4f  %8.4f\n",
+    "Rawlsian (Mr)",
+    rawlsian_c1,
+    rawlsian_c2,
+    rawlsian_c3))
+cat("\n")
+cat("Totalitarian ranking: Config 3 > Config 1 > Config 2\n")
+cat("Rawlsian ranking:     Config 3 > Config 2 > Config 1\n")
+cat("Both frameworks recommend Config 3 as the most just configuration.\n")
+```
