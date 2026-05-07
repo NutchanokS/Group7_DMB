@@ -436,3 +436,911 @@ What does it mean for management, and what should they do?
     -   Full simulation details
     -   Extra tables/figures
     -   References
+
+
+\newpage
+
+Simulation
+burst in last 5 minutes while 80% arrive is women
+
+Sevice time variance increase by class 2 probability increase from 0.05 to 0.5
+
+```{r}
+#| label: setup-and-parameters
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+seed1 <- 123
+n_rep <- 500
+intermission_length <- 25
+
+# -----------------------------
+# Case parameters
+# -----------------------------
+
+intermission_length <- 25
+
+# Historical arrival rates
+lambda_women <- 3.2
+lambda_men <- 3.2
+
+# Preference proportions
+pref_GS <- 0.70
+pref_NP <- 0.21
+pref_UX <- 0.09
+
+# Class 2 probability
+prob_class2 <- 0.05
+
+# Service time parameters
+service_mean_women_class1 <- 1.67
+service_sd_women_class1 <- 1.2
+
+service_mean_women_class2 <- 5.2
+service_sd_women_class2 <- 3.2
+
+service_mean_men_class1 <- 0.833
+service_sd_men_class1 <- 0.7
+
+service_mean_men_class2 <- 5.2
+service_sd_men_class2 <- 3.2
+
+
+# -----------------------------
+# Preference score table
+# -----------------------------
+
+score_table <- data.frame(
+  wait = c(
+    rep(0, 12), rep(5, 12), rep(10, 12), rep(20, 12), rep(40, 12)
+  ),
+  gender = c(
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M"
+  ),
+  pref = c(
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX"
+  ),
+  uses = c(
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX"
+  ),
+  score = c(
+    5,4,5,5,3,5,5,4,5,5,3,5,
+    4,3,4,4,2,4,4,3,4,4,2,4,
+    3,2,2,2,1,3,3,2,2,2,1,3,
+    1,1,1,1,0,2,2,0,1,1,0,2,
+    0,0,0,0,0,1,0,0,0,0,0,1
+  )
+)
+```
+
+```{r}
+#| label: model-and-simulation-functions
+#| include: false
+
+# ============================================================
+# Basic helper functions
+# ============================================================
+
+rnorm_positive <- function(n, mean, sd) {
+  x <- rnorm(n, mean = mean, sd = sd)
+  
+  while (any(x <= 0)) {
+    x[x <= 0] <- rnorm(sum(x <= 0), mean = mean, sd = sd)
+  }
+  
+  return(x)
+}
+
+
+WAST_computation_general <- function(n, sigma, AST) {
+  total_N <- sum(n)
+  p_all <- sum(n * AST) / total_N
+  
+  variance_terms <- n * (sigma^2 + (AST - p_all)^2)
+  sigma_all <- sqrt(sum(variance_terms) / total_N)
+  
+  list(mean = p_all, sigma = sigma_all)
+}
+
+
+get_capacity <- function(config) {
+  
+  if (config == "Status Quo") {
+    return(list(
+      women_stall = 20,
+      men_urinal = 10,
+      men_stall = 10,
+      unisex = 0
+    ))
+  }
+  
+  if (config == "All Unisex") {
+    return(list(
+      women_stall = 0,
+      men_urinal = 0,
+      men_stall = 0,
+      unisex = 40
+    ))
+  }
+  
+  if (config == "Hybrid") {
+    return(list(
+      women_stall = 15,
+      men_urinal = 10,
+      men_stall = 5,
+      unisex = 10
+    ))
+  }
+  
+  stop("Unknown configuration")
+}
+
+
+# ============================================================
+# Stage 1: M/G/k analytical model
+# This follows the GGK function style from the workshop.
+# M/G/k is obtained by setting cv_arrival = 1.
+# ============================================================
+
+calculate_ggk_metrics <- function(arrival_rate, service_rate, k, cv_arrival, cv_service) {
+  
+  rho <- arrival_rate / (k * service_rate)
+  
+  if (rho >= 1) {
+    return(tibble(
+      utilization = rho,
+      prob_wait = NA_real_,
+      Lq = NA_real_,
+      L = NA_real_,
+      Wq = NA_real_,
+      W = NA_real_,
+      status = "Unstable"
+    ))
+  }
+  
+  E_s <- 1 / service_rate
+  prob_wait <- rho^(sqrt(2 * (k + 1)) - 1)
+  
+  ca_sq <- cv_arrival^2
+  cs_sq <- cv_service^2
+  
+  Wq <- ((ca_sq + cs_sq) / 2) *
+    (prob_wait / (k * (1 - rho))) * E_s
+  
+  W <- Wq + E_s
+  Lq <- arrival_rate * Wq
+  L <- arrival_rate * W
+  
+  tibble(
+    utilization = rho,
+    prob_wait = prob_wait,
+    Lq = Lq,
+    L = L,
+    Wq = Wq,
+    W = W,
+    status = "Stable"
+  )
+}
+
+
+mgk_row <- function(configuration, facility, arrival_rate, k,
+                    component_rates, component_sigmas, component_means) {
+  
+  service <- WAST_computation_general(
+    n = component_rates,
+    sigma = component_sigmas,
+    AST = component_means
+  )
+  
+  bind_cols(
+    tibble(
+      configuration = configuration,
+      facility = facility,
+      arrival_rate = arrival_rate,
+      servers = k,
+      service_mean = service$mean,
+      service_sigma = service$sigma
+    ),
+    calculate_ggk_metrics(
+      arrival_rate = arrival_rate,
+      service_rate = 1 / service$mean,
+      k = k,
+      cv_arrival = 1,
+      cv_service = service$sigma / service$mean
+    )
+  )
+}
+
+
+run_mgk_analysis <- function(np_to_gs = 0.5) {
+  
+  # Baseline class-specific arrival rates
+  arrival_women_class1 <- lambda_women * (1 - prob_class2)
+  arrival_women_class2 <- lambda_women * prob_class2
+  
+  arrival_men_class1 <- lambda_men * (1 - prob_class2)
+  arrival_men_class2 <- lambda_men * prob_class2
+  
+  # Hybrid split rates
+  women_gs_rate <- lambda_women * (pref_GS + pref_NP * np_to_gs)
+  men_gs_rate <- lambda_men * (pref_GS + pref_NP * np_to_gs)
+  
+  women_ux_rate <- lambda_women * (pref_UX + pref_NP * (1 - np_to_gs))
+  men_ux_rate <- lambda_men * (pref_UX + pref_NP * (1 - np_to_gs))
+  
+  bind_rows(
+    # Status Quo
+    mgk_row(
+      configuration = "Status Quo",
+      facility = "Women stalls",
+      arrival_rate = lambda_women,
+      k = 20,
+      component_rates = c(arrival_women_class1, arrival_women_class2),
+      component_sigmas = c(service_sd_women_class1, service_sd_women_class2),
+      component_means = c(service_mean_women_class1, service_mean_women_class2)
+    ),
+    
+    mgk_row(
+      configuration = "Status Quo",
+      facility = "Men urinals",
+      arrival_rate = arrival_men_class1,
+      k = 10,
+      component_rates = c(arrival_men_class1),
+      component_sigmas = c(service_sd_men_class1),
+      component_means = c(service_mean_men_class1)
+    ),
+    
+    mgk_row(
+      configuration = "Status Quo",
+      facility = "Men stalls",
+      arrival_rate = arrival_men_class2,
+      k = 10,
+      component_rates = c(arrival_men_class2),
+      component_sigmas = c(service_sd_men_class2),
+      component_means = c(service_mean_men_class2)
+    ),
+    
+    # All Unisex
+    mgk_row(
+      configuration = "All Unisex",
+      facility = "Unisex",
+      arrival_rate = lambda_women + lambda_men,
+      k = 40,
+      component_rates = c(
+        arrival_women_class1,
+        arrival_women_class2,
+        arrival_men_class1,
+        arrival_men_class2
+      ),
+      component_sigmas = c(
+        service_sd_women_class1,
+        service_sd_women_class2,
+        service_sd_men_class1,
+        service_sd_men_class2
+      ),
+      component_means = c(
+        service_mean_women_class1,
+        service_mean_women_class2,
+        service_mean_men_class1,
+        service_mean_men_class2
+      )
+    ),
+    
+    # Hybrid
+    mgk_row(
+      configuration = "Hybrid",
+      facility = "Women stalls",
+      arrival_rate = women_gs_rate,
+      k = 15,
+      component_rates = c(
+        women_gs_rate * (1 - prob_class2),
+        women_gs_rate * prob_class2
+      ),
+      component_sigmas = c(service_sd_women_class1, service_sd_women_class2),
+      component_means = c(service_mean_women_class1, service_mean_women_class2)
+    ),
+    
+    mgk_row(
+      configuration = "Hybrid",
+      facility = "Men urinals",
+      arrival_rate = men_gs_rate * (1 - prob_class2),
+      k = 10,
+      component_rates = c(men_gs_rate * (1 - prob_class2)),
+      component_sigmas = c(service_sd_men_class1),
+      component_means = c(service_mean_men_class1)
+    ),
+    
+    mgk_row(
+      configuration = "Hybrid",
+      facility = "Men stalls",
+      arrival_rate = men_gs_rate * prob_class2,
+      k = 5,
+      component_rates = c(men_gs_rate * prob_class2),
+      component_sigmas = c(service_sd_men_class2),
+      component_means = c(service_mean_men_class2)
+    ),
+    
+    mgk_row(
+      configuration = "Hybrid",
+      facility = "Unisex",
+      arrival_rate = women_ux_rate + men_ux_rate,
+      k = 10,
+      component_rates = c(
+        women_ux_rate * (1 - prob_class2),
+        women_ux_rate * prob_class2,
+        men_ux_rate * (1 - prob_class2),
+        men_ux_rate * prob_class2
+      ),
+      component_sigmas = c(
+        service_sd_women_class1,
+        service_sd_women_class2,
+        service_sd_men_class1,
+        service_sd_men_class2
+      ),
+      component_means = c(
+        service_mean_women_class1,
+        service_mean_women_class2,
+        service_mean_men_class1,
+        service_mean_men_class2
+      )
+    )
+  )
+}
+
+
+# ============================================================
+# Stage 2: simulation functions
+# ============================================================
+
+generate_stage2_users <- function(rep_id, scenario, arrival_pattern, prob_class2_scenario) {
+  
+  set.seed(seed1 + rep_id)
+  
+  n_users <- round((lambda_women + lambda_men) * intermission_length)
+  
+  if (arrival_pattern == "burst") {
+    
+    # 80% arrive in the final 5 minutes
+    n_late <- round(0.80 * n_users)
+    n_early <- n_users - n_late
+    
+    arrival_time <- c(
+      runif(n_early, min = 0, max = 20),
+      runif(n_late, min = 20, max = 25)
+    )
+    
+    arrival_period <- c(rep("early", n_early), rep("late", n_late))
+    
+    gender <- c(
+      sample(c("W", "M"), n_early, replace = TRUE, prob = c(0.5, 0.5)),
+      sample(c("W", "M"), n_late, replace = TRUE, prob = c(0.8, 0.2))
+    )
+  }
+  
+  if (arrival_pattern == "baseline") {
+    
+    arrival_time <- runif(n_users, min = 0, max = intermission_length)
+    arrival_period <- rep("baseline", n_users)
+    
+    gender <- sample(
+      c("W", "M"),
+      n_users,
+      replace = TRUE,
+      prob = c(0.5, 0.5)
+    )
+  }
+  
+  service_class <- sample(
+    c("class1", "class2"),
+    n_users,
+    replace = TRUE,
+    prob = c(1 - prob_class2_scenario, prob_class2_scenario)
+  )
+  
+  preference <- sample(
+    c("GS", "NP", "UX"),
+    n_users,
+    replace = TRUE,
+    prob = c(pref_GS, pref_NP, pref_UX)
+  )
+  
+  service_time <- numeric(n_users)
+  
+  for (i in 1:n_users) {
+    
+    if (gender[i] == "W" & service_class[i] == "class1") {
+      service_time[i] <- rnorm_positive(
+        1,
+        service_mean_women_class1,
+        service_sd_women_class1
+      )
+    }
+    
+    if (gender[i] == "W" & service_class[i] == "class2") {
+      service_time[i] <- rnorm_positive(
+        1,
+        service_mean_women_class2,
+        service_sd_women_class2
+      )
+    }
+    
+    if (gender[i] == "M" & service_class[i] == "class1") {
+      service_time[i] <- rnorm_positive(
+        1,
+        service_mean_men_class1,
+        service_sd_men_class1
+      )
+    }
+    
+    if (gender[i] == "M" & service_class[i] == "class2") {
+      service_time[i] <- rnorm_positive(
+        1,
+        service_mean_men_class2,
+        service_sd_men_class2
+      )
+    }
+  }
+  
+  tibble(
+    rep = rep_id,
+    scenario = scenario,
+    id = 1:n_users,
+    arrival_time = arrival_time,
+    arrival_period = arrival_period,
+    gender = gender,
+    service_class = service_class,
+    preference = preference,
+    service_time = service_time
+  ) |>
+    arrange(arrival_time)
+}
+
+
+assign_facility <- function(users, config, np_to_gs = 0.5) {
+  
+  users$facility <- NA
+  
+  if (config == "Status Quo") {
+    users$facility[users$gender == "W"] <- "women_stall"
+    users$facility[users$gender == "M" & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & users$service_class == "class2"] <- "men_stall"
+  }
+  
+  if (config == "All Unisex") {
+    users$facility <- "unisex"
+  }
+  
+  if (config == "Hybrid") {
+    
+    users$facility[users$gender == "W" & users$preference == "GS"] <- "women_stall"
+    users$facility[users$gender == "M" & users$preference == "GS" & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & users$preference == "GS" & users$service_class == "class2"] <- "men_stall"
+    
+    users$facility[users$preference == "UX"] <- "unisex"
+    
+    is_np <- users$preference == "NP"
+    go_to_gs <- runif(nrow(users)) < np_to_gs
+    
+    users$facility[users$gender == "W" & is_np & go_to_gs] <- "women_stall"
+    users$facility[users$gender == "W" & is_np & !go_to_gs] <- "unisex"
+    
+    users$facility[users$gender == "M" & is_np & go_to_gs & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & is_np & go_to_gs & users$service_class == "class2"] <- "men_stall"
+    users$facility[users$gender == "M" & is_np & !go_to_gs] <- "unisex"
+  }
+  
+  return(users)
+}
+
+
+simulate_queue <- function(queue_data, k) {
+  
+  queue_data <- queue_data |>
+    arrange(arrival_time)
+  
+  n <- nrow(queue_data)
+  server_available <- rep(0, k)
+  
+  start_time <- numeric(n)
+  completion_time <- numeric(n)
+  
+  for (i in 1:n) {
+    
+    next_server <- which.min(server_available)
+    
+    start_time[i] <- max(queue_data$arrival_time[i], server_available[next_server])
+    completion_time[i] <- start_time[i] + queue_data$service_time[i]
+    
+    server_available[next_server] <- completion_time[i]
+  }
+  
+  queue_data |>
+    mutate(
+      start_time = start_time,
+      completion_time = completion_time,
+      waiting_time = start_time - arrival_time,
+      system_time = completion_time - arrival_time
+    )
+}
+
+
+simulate_config <- function(users, config, np_to_gs = 0.5) {
+  
+  users_routed <- assign_facility(users, config, np_to_gs)
+  cap <- get_capacity(config)
+  
+  map_dfr(names(cap), function(fac) {
+    
+    fac_data <- users_routed |>
+      filter(facility == fac)
+    
+    if (nrow(fac_data) == 0 || cap[[fac]] == 0) {
+      return(NULL)
+    }
+    
+    simulate_queue(fac_data, k = cap[[fac]])
+    
+  }) |>
+    mutate(configuration = config)
+}
+
+
+run_all_configurations <- function(users, np_to_gs = 0.5) {
+  
+  c("Status Quo", "All Unisex", "Hybrid") |>
+    map_dfr(~ simulate_config(users, config = .x, np_to_gs = np_to_gs))
+}
+
+
+add_preference_score <- function(results) {
+  
+  results |>
+    mutate(
+      uses = ifelse(facility == "unisex", "UX", "GS"),
+      
+      wait = case_when(
+        waiting_time >= 40 ~ 40,
+        waiting_time >= 20 ~ 20,
+        waiting_time >= 10 ~ 10,
+        waiting_time >= 5 ~ 5,
+        TRUE ~ 0
+      )
+    ) |>
+    left_join(
+      score_table,
+      by = c("wait", "gender", "preference" = "pref", "uses")
+    )
+}
+
+
+summarise_one_rep <- function(results) {
+  
+  efficiency <- results |>
+    group_by(rep, scenario, configuration) |>
+    summarise(
+      mean_wait = mean(waiting_time),
+      p90_wait = as.numeric(quantile(waiting_time, 0.90)),
+      mean_system_time = mean(system_time),
+      pct_completed_within_25 = mean(completion_time <= 25) * 100,
+      n_still_in_system_at_25 = sum(completion_time > 25),
+      .groups = "drop"
+    )
+  
+  scored <- add_preference_score(results)
+  
+  score_overall <- scored |>
+  group_by(rep, scenario, configuration) |>
+  summarise(
+    totalitarian_score = mean(score, na.rm = TRUE),
+    .groups = "drop"
+  )
+  
+  score_worst <- scored |>
+  group_by(rep, scenario, configuration, preference) |>
+  summarise(
+    preference_group_score = mean(score, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  group_by(rep, scenario, configuration) |>
+  summarise(
+    rawlsian_score = min(preference_group_score),
+    .groups = "drop"
+  )
+  
+  efficiency |>
+    left_join(score_overall, by = c("rep", "scenario", "configuration")) |>
+    left_join(score_worst, by = c("rep", "scenario", "configuration"))
+}
+
+
+run_one_replication <- function(rep_id, np_to_gs = 0.5) {
+  
+  users_burst <- generate_stage2_users(
+    rep_id = rep_id,
+    scenario = "Burst arrival",
+    arrival_pattern = "burst",
+    prob_class2_scenario = 0.05
+  )
+  
+  users_diverse <- generate_stage2_users(
+    rep_id = rep_id + 10000,
+    scenario = "Diverse service needs",
+    arrival_pattern = "baseline",
+    prob_class2_scenario = 0.50
+  )
+  
+  results <- bind_rows(
+    run_all_configurations(users_burst, np_to_gs = np_to_gs),
+    run_all_configurations(users_diverse, np_to_gs = np_to_gs)
+  )
+  
+  summarise_one_rep(results)
+}
+```
+
+```{r}
+#| label: run-analysis
+#| include: false
+
+# -----------------------------
+# Stage 1: M/G/k analytical model
+# -----------------------------
+
+mgk_results <- run_mgk_analysis(np_to_gs = 0.5)
+
+
+# -----------------------------
+# Stage 2: simulation stress tests
+# -----------------------------
+
+stage2_rep_results <- map_dfr(
+  1:n_rep,
+  ~ run_one_replication(rep_id = .x, np_to_gs = 0.5)
+)
+
+stage2_summary <- stage2_rep_results |>
+  group_by(scenario, configuration) |>
+  summarise(
+    mean_wait = mean(mean_wait),
+    p90_wait = mean(p90_wait),
+    mean_system_time = mean(mean_system_time),
+    pct_completed_within_25 = mean(pct_completed_within_25),
+    n_still_in_system_at_25 = mean(n_still_in_system_at_25),
+    totalitarian_score = mean(totalitarian_score),
+    rawlsian_score = mean(rawlsian_score),
+    .groups = "drop"
+  ) |>
+  group_by(scenario) |>
+  mutate(
+    totalitarian_rank = rank(-totalitarian_score, ties.method = "min"),
+    rawlsian_rank = rank(-rawlsian_score, ties.method = "min")
+  ) |>
+  ungroup()
+```
+
+```{r}
+#| label: tbl-mgk-results
+#| echo: false
+
+mgk_results |>
+  select(
+    Configuration = configuration,
+    Facility = facility,
+    `Arrival rate` = arrival_rate,
+    Servers = servers,
+    Utilisation = utilization,
+    `Pr(wait)` = prob_wait,
+    `Wq (min)` = Wq,
+    `W (min)` = W,
+    Status = status
+  ) |>
+  mutate(
+    across(where(is.numeric), ~ round(.x, 4))
+  ) |>
+  kable(
+    caption = "Stage 1 M/G/k analytical queueing results",
+    booktabs = TRUE
+  )
+```
+
+```{r}
+#| label: tbl-stage2-burst
+#| echo: false
+
+stage2_summary |>
+  filter(scenario == "Burst arrival") |>
+  select(
+    Configuration = configuration,
+    `Mean wait (min)` = mean_wait,
+    `P90 wait (min)` = p90_wait,
+    `Mean system time (min)` = mean_system_time,
+    `Completed within 25 min (%)` = pct_completed_within_25,
+    `Still in system at 25 min` = n_still_in_system_at_25,
+    `Totalitarian score` = totalitarian_score,
+    `Rawlsian score` = rawlsian_score,
+    `Totalitarian rank` = totalitarian_rank,
+    `Rawlsian rank` = rawlsian_rank
+  ) |>
+  mutate(
+    across(where(is.numeric), ~ round(.x, 3))
+  ) |>
+  kable(
+    caption = "Stage 2 stress test: burst-arrival scenario, averaged over 500 simulation replications",
+    booktabs = TRUE
+  )
+```
+
+```{r}
+#| label: tbl-stage2-diverse-service-needs
+#| echo: false
+
+stage2_summary |>
+  filter(scenario == "Diverse service needs") |>
+  select(
+    Configuration = configuration,
+    `Mean wait (min)` = mean_wait,
+    `P90 wait (min)` = p90_wait,
+    `Mean system time (min)` = mean_system_time,
+    `Completed within 25 min (%)` = pct_completed_within_25,
+    `Still in system at 25 min` = n_still_in_system_at_25,
+    `Totalitarian score` = totalitarian_score,
+    `Rawlsian score` = rawlsian_score,
+    `Totalitarian rank` = totalitarian_rank,
+    `Rawlsian rank` = rawlsian_rank
+  ) |>
+  mutate(
+    across(where(is.numeric), ~ round(.x, 3))
+  ) |>
+  kable(
+    caption = "Stage 2 stress test: diverse service-needs scenario under Totalitarian and Rawlsian approaches, averaged over 500 simulation replications",
+    booktabs = TRUE
+  )
+```
+
+```{r}
+#| label: fig-burst-mean-wait
+#| echo: false
+#| fig-cap: "Mean waiting time under the burst-arrival stress test, averaged over 500 simulation replications."
+
+stage2_summary |>
+  filter(scenario == "Burst arrival") |>
+  ggplot(aes(x = configuration, y = mean_wait, fill = configuration)) +
+  geom_col(width = 0.75) +
+  geom_text(
+    aes(label = sprintf("%.2f", mean_wait)),
+    vjust = -0.3,
+    size = 3
+  ) +
+  labs(
+    x = "Configuration",
+    y = "Mean waiting time (minutes)",
+    title = "Mean Waiting Time under Burst Arrival"
+  ) +
+  expand_limits(
+    y = max(stage2_summary$mean_wait[stage2_summary$scenario == "Burst arrival"]) * 1.15
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+```{r}
+#| label: fig-burst-completion
+#| echo: false
+#| fig-cap: "Percentage of users completing restroom use within the 25-minute intermission under the burst-arrival stress test."
+
+stage2_summary |>
+  filter(scenario == "Burst arrival") |>
+  ggplot(aes(x = configuration, y = pct_completed_within_25, fill = configuration)) +
+  geom_col(width = 0.75) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct_completed_within_25)),
+    vjust = -0.3,
+    size = 3
+  ) +
+  labs(
+    x = "Configuration",
+    y = "Completed within 25 minutes (%)",
+    title = "Completion Rate under Burst Arrival"
+  ) +
+  expand_limits(y = 100) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+```{r}
+#| label: fig-burst-totalitarian-rawlsian
+#| echo: false
+#| fig-cap: "Totalitarian and Rawlsian preference scores under the burst-arrival stress test."
+
+stage2_summary |>
+  filter(scenario == "Burst arrival") |>
+  select(
+    configuration,
+    totalitarian_score,
+    rawlsian_score
+  ) |>
+  pivot_longer(
+    cols = c(totalitarian_score, rawlsian_score),
+    names_to = "approach",
+    values_to = "score"
+  ) |>
+  mutate(
+    approach = recode(
+      approach,
+      "totalitarian_score" = "Totalitarian",
+      "rawlsian_score" = "Rawlsian"
+    )
+  ) |>
+  ggplot(aes(x = configuration, y = score, fill = approach)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", score)),
+    position = position_dodge(width = 0.8),
+    vjust = -0.3,
+    size = 3
+  ) +
+  labs(
+    x = "Configuration",
+    y = "Preference score",
+    fill = "Approach",
+    title = "Totalitarian vs Rawlsian Preference Scores"
+  ) +
+  expand_limits(y = 5) +
+  theme_minimal()
+```
+
+```{r}
+#| label: fig-diverse-totalitarian-rawlsian
+#| echo: false
+#| fig-cap: "Totalitarian and Rawlsian preference scores under the diverse service-needs stress test."
+
+stage2_summary |>
+  filter(scenario == "Diverse service needs") |>
+  select(
+    configuration,
+    totalitarian_score,
+    rawlsian_score
+  ) |>
+  pivot_longer(
+    cols = c(totalitarian_score, rawlsian_score),
+    names_to = "approach",
+    values_to = "score"
+  ) |>
+  mutate(
+    approach = recode(
+      approach,
+      "totalitarian_score" = "Totalitarian",
+      "rawlsian_score" = "Rawlsian"
+    )
+  ) |>
+  ggplot(aes(x = configuration, y = score, fill = approach)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", score)),
+    position = position_dodge(width = 0.8),
+    vjust = -0.3,
+    size = 3
+  ) +
+  labs(
+    x = "Configuration",
+    y = "Preference score",
+    fill = "Approach",
+    title = "Preference Scores under Diverse Service Needs"
+  ) +
+  expand_limits(y = 5) +
+  theme_minimal()
+```
