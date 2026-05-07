@@ -1344,3 +1344,831 @@ stage2_summary |>
   expand_limits(y = 5) +
   theme_minimal()
 ```
+
+
+burst in first 5 minutes while 80% arrive is women
+
+```{r}
+# ============================================================
+# Stage 2 Simulation:
+# Female-Dominant Burst + High Service-Time Variance
+# ============================================================
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+set.seed(123)
+
+# ============================================================
+# 1. Main simulation settings
+# ============================================================
+
+n_rep <- 500
+intermission_length <- 25
+
+# Arrival rate from case:
+# Women = 3.2 per minute, Men = 3.2 per minute
+total_arrival_rate <- 6.4
+expected_users <- total_arrival_rate * intermission_length
+
+configs <- c("Status Quo", "All Unisex", "Hybrid Model")
+
+# Stage 2 scenarios:
+# Both scenarios use the same female-dominant burst.
+stage2_scenarios <- data.frame(
+  scenario = c(
+    "Female-dominant burst",
+    "Female-dominant burst + high service variance"
+  ),
+  early_prop = c(0.80, 0.80),
+  early_female_prop = c(0.80, 0.80),
+  late_female_prop = c(0.50, 0.50),
+  service_sd_multiplier = c(1.00, 1.50),
+  class2_prob = c(0.05, 0.10)
+)
+
+stage2_scenarios
+
+stage2_scenarios$scenario <- factor(
+  stage2_scenarios$scenario,
+  levels = stage2_scenarios$scenario
+)
+
+# ============================================================
+# 2. Service-time generator
+# ============================================================
+# Lognormal service time is used because service time cannot be negative.
+
+r_service_lognormal <- function(n, mean_service, sd_service) {
+  sigma2 <- log(1 + (sd_service^2 / mean_service^2))
+  sigma <- sqrt(sigma2)
+  mu <- log(mean_service) - sigma2 / 2
+  
+  rlnorm(n, meanlog = mu, sdlog = sigma)
+}
+
+# ============================================================
+# 3. Generate users for one intermission
+# ============================================================
+
+generate_users <- function(
+    early_prop,
+    early_female_prop,
+    late_female_prop,
+    service_sd_multiplier,
+    class2_prob
+) {
+  
+  # Random total number of restroom users
+  N <- rpois(1, lambda = expected_users)
+  
+  # -----------------------------
+  # Arrival times
+  # -----------------------------
+  
+  n_early <- round(N * early_prop)
+  n_late <- N - n_early
+  
+  # 80% arrive in first 5 minutes
+  early_arrivals <- runif(n_early, min = 0, max = 5)
+  
+  # remaining 20% arrive from minute 5 to 25
+  late_arrivals <- runif(n_late, min = 5, max = intermission_length)
+  
+  # -----------------------------
+  # Gender mix
+  # -----------------------------
+  
+  early_gender <- sample(
+    c("Women", "Men"),
+    size = n_early,
+    replace = TRUE,
+    prob = c(early_female_prop, 1 - early_female_prop)
+  )
+  
+  late_gender <- sample(
+    c("Women", "Men"),
+    size = n_late,
+    replace = TRUE,
+    prob = c(late_female_prop, 1 - late_female_prop)
+  )
+  
+  users <- data.frame(
+    user_id = 1:N,
+    arrival_time = c(early_arrivals, late_arrivals),
+    gender = c(early_gender, late_gender)
+  )
+  
+  # -----------------------------
+  # Preference type
+  # GS = gender-segregated preference
+  # NP = no preference
+  # UX = unisex preference
+  # -----------------------------
+  
+  users$preference <- sample(
+    c("GS", "NP", "UX"),
+    size = N,
+    replace = TRUE,
+    prob = c(0.70, 0.21, 0.09)
+  )
+  
+  # -----------------------------
+  # Service class
+  # Class 2 users have longer service needs
+  # -----------------------------
+  
+  users$class_type <- sample(
+    c("Class 1", "Class 2"),
+    size = N,
+    replace = TRUE,
+    prob = c(1 - class2_prob, class2_prob)
+  )
+  
+  # -----------------------------
+  # Service-time parameters
+  # -----------------------------
+  
+  users <- users %>%
+    mutate(
+      service_mean = case_when(
+        gender == "Women" & class_type == "Class 1" ~ 1.67,
+        gender == "Men"   & class_type == "Class 1" ~ 0.833,
+        class_type == "Class 2" ~ 5.20
+      ),
+      service_sd = case_when(
+        gender == "Women" & class_type == "Class 1" ~ 1.20,
+        gender == "Men"   & class_type == "Class 1" ~ 0.70,
+        class_type == "Class 2" ~ 3.20
+      ),
+      service_sd = service_sd * service_sd_multiplier
+    )
+  
+  # Generate random service time
+  users$service_time <- mapply(
+    r_service_lognormal,
+    n = 1,
+    mean_service = users$service_mean,
+    sd_service = users$service_sd
+  )
+  
+  users <- users %>%
+    arrange(arrival_time)
+  
+  row.names(users) <- NULL
+  
+  users
+}
+
+# ============================================================
+# 4. Multi-server queue simulator
+# ============================================================
+# Each stall or urinal is treated as one server.
+
+simulate_queue_k <- function(arrival_time, service_time, k) {
+  
+  n <- length(arrival_time)
+  next_free <- rep(0, k)
+  
+  start_time <- numeric(n)
+  completion_time <- numeric(n)
+  waiting_time <- numeric(n)
+  system_time <- numeric(n)
+  
+  for (i in 1:n) {
+    
+    server <- which.min(next_free)
+    
+    start_time[i] <- max(arrival_time[i], next_free[server])
+    waiting_time[i] <- start_time[i] - arrival_time[i]
+    completion_time[i] <- start_time[i] + service_time[i]
+    system_time[i] <- completion_time[i] - arrival_time[i]
+    
+    next_free[server] <- completion_time[i]
+  }
+  
+  data.frame(
+    start_time = start_time,
+    completion_time = completion_time,
+    waiting_time = waiting_time,
+    system_time = system_time
+  )
+}
+
+# ============================================================
+# 5. Assign users to facilities
+# ============================================================
+
+assign_facility <- function(users, config_name, np_unisex_prob = 0.50) {
+  
+  users$facility <- NA
+  
+  # -----------------------------
+  # Status Quo:
+  # 20 women's stalls, 10 men's urinals, 10 men's stalls
+  # -----------------------------
+  
+  if (config_name == "Status Quo") {
+    
+    users$facility[users$gender == "Women"] <- "Women_stalls"
+    
+    users$facility[
+      users$gender == "Men" & users$class_type == "Class 1"
+    ] <- "Men_urinals"
+    
+    users$facility[
+      users$gender == "Men" & users$class_type == "Class 2"
+    ] <- "Men_stalls"
+  }
+  
+  # -----------------------------
+  # All Unisex:
+  # 40 universal stalls
+  # -----------------------------
+  
+  if (config_name == "All Unisex") {
+    users$facility <- "Unisex_stalls"
+  }
+  
+  # -----------------------------
+  # Hybrid Model:
+  # 15 women's stalls, 10 men's urinals,
+  # 5 men's stalls, 10 unisex stalls
+  # -----------------------------
+  
+  if (config_name == "Hybrid Model") {
+    
+    # Unisex-preference users
+    users$facility[users$preference == "UX"] <- "Unisex_stalls"
+    
+    # Gender-segregated preference users
+    users$facility[
+      users$preference == "GS" &
+        users$gender == "Women"
+    ] <- "Women_stalls"
+    
+    users$facility[
+      users$preference == "GS" &
+        users$gender == "Men" &
+        users$class_type == "Class 1"
+    ] <- "Men_urinals"
+    
+    users$facility[
+      users$preference == "GS" &
+        users$gender == "Men" &
+        users$class_type == "Class 2"
+    ] <- "Men_stalls"
+    
+    # No-preference users split between gendered and unisex
+    np_index <- which(users$preference == "NP")
+    go_unisex <- runif(length(np_index)) < np_unisex_prob
+    
+    users$facility[np_index[go_unisex]] <- "Unisex_stalls"
+    
+    gendered_np <- np_index[!go_unisex]
+    
+    users$facility[
+      gendered_np[users$gender[gendered_np] == "Women"]
+    ] <- "Women_stalls"
+    
+    users$facility[
+      gendered_np[
+        users$gender[gendered_np] == "Men" &
+          users$class_type[gendered_np] == "Class 1"
+      ]
+    ] <- "Men_urinals"
+    
+    users$facility[
+      gendered_np[
+        users$gender[gendered_np] == "Men" &
+          users$class_type[gendered_np] == "Class 2"
+      ]
+    ] <- "Men_stalls"
+  }
+  
+  users
+}
+
+# ============================================================
+# 6. Simulate one configuration
+# ============================================================
+
+simulate_config <- function(users, config_name, np_unisex_prob = 0.50) {
+  
+  users <- assign_facility(
+    users = users,
+    config_name = config_name,
+    np_unisex_prob = np_unisex_prob
+  )
+  
+  if (config_name == "Status Quo") {
+    capacity <- c(
+      Women_stalls = 20,
+      Men_urinals = 10,
+      Men_stalls = 10
+    )
+  }
+  
+  if (config_name == "All Unisex") {
+    capacity <- c(
+      Unisex_stalls = 40
+    )
+  }
+  
+  if (config_name == "Hybrid Model") {
+    capacity <- c(
+      Women_stalls = 15,
+      Men_urinals = 10,
+      Men_stalls = 5,
+      Unisex_stalls = 10
+    )
+  }
+  
+  output <- data.frame()
+  
+  for (fac in names(capacity)) {
+    
+    sub_users <- users %>%
+      filter(facility == fac) %>%
+      arrange(arrival_time)
+    
+    if (nrow(sub_users) > 0) {
+      
+      q_result <- simulate_queue_k(
+        arrival_time = sub_users$arrival_time,
+        service_time = sub_users$service_time,
+        k = capacity[fac]
+      )
+      
+      sub_users$start_time <- q_result$start_time
+      sub_users$completion_time <- q_result$completion_time
+      sub_users$waiting_time <- q_result$waiting_time
+      sub_users$system_time <- q_result$system_time
+      
+      output <- rbind(output, sub_users)
+    }
+  }
+  
+  output$config <- config_name
+  
+  output
+}
+
+# ============================================================
+# 7. Preference / equity score table
+# ============================================================
+
+score_table <- data.frame(
+  gender = rep(c("Women", "Men"), each = 6),
+  preference = rep(c("GS", "GS", "NP", "NP", "UX", "UX"), times = 2),
+  restroom_type = rep(c("GS", "Unisex"), times = 6),
+  
+  score_0 = c(
+    5, 4, 5, 5, 3, 5,
+    5, 4, 5, 5, 3, 5
+  ),
+  
+  score_5 = c(
+    4, 3, 4, 4, 2, 4,
+    4, 3, 4, 4, 2, 4
+  ),
+  
+  score_10 = c(
+    3, 2, 2, 2, 1, 3,
+    3, 2, 2, 2, 1, 3
+  ),
+  
+  score_20 = c(
+    1, 1, 1, 1, 0, 2,
+    2, 0, 1, 1, 0, 2
+  ),
+  
+  score_40 = c(
+    0, 0, 0, 0, 0, 1,
+    0, 0, 0, 0, 0, 1
+  )
+)
+
+score_table_long <- score_table %>%
+  pivot_longer(
+    cols = starts_with("score_"),
+    names_to = "wait_band",
+    values_to = "equity_score"
+  ) %>%
+  mutate(
+    wait_band = as.numeric(gsub("score_", "", wait_band))
+  )
+
+get_restroom_type <- function(facility) {
+  ifelse(facility == "Unisex_stalls", "Unisex", "GS")
+}
+
+get_wait_band <- function(wait_time) {
+  case_when(
+    wait_time >= 40 ~ 40,
+    wait_time >= 20 ~ 20,
+    wait_time >= 10 ~ 10,
+    wait_time >= 5  ~ 5,
+    TRUE ~ 0
+  )
+}
+
+add_equity_scores <- function(sim_data) {
+  
+  sim_data %>%
+    mutate(
+      restroom_type = get_restroom_type(facility),
+      wait_band = get_wait_band(waiting_time)
+    ) %>%
+    left_join(
+      score_table_long,
+      by = c("gender", "preference", "restroom_type", "wait_band")
+    )
+}
+
+# ============================================================
+# 8. Run repeated Stage 2 simulation
+# ============================================================
+
+config_results <- list()
+gender_results <- list()
+group_equity_results <- list()
+
+counter <- 1
+
+for (s in 1:nrow(stage2_scenarios)) {
+  
+  scenario_name <- stage2_scenarios$scenario[s]
+  early_prop_s <- stage2_scenarios$early_prop[s]
+  early_female_prop_s <- stage2_scenarios$early_female_prop[s]
+  late_female_prop_s <- stage2_scenarios$late_female_prop[s]
+  sd_multiplier_s <- stage2_scenarios$service_sd_multiplier[s]
+  class2_prob_s <- stage2_scenarios$class2_prob[s]
+  
+  for (r in 1:n_rep) {
+    
+    users_r <- generate_users(
+      early_prop = early_prop_s,
+      early_female_prop = early_female_prop_s,
+      late_female_prop = late_female_prop_s,
+      service_sd_multiplier = sd_multiplier_s,
+      class2_prob = class2_prob_s
+    )
+    
+    for (cfg in configs) {
+      
+      sim <- simulate_config(users_r, cfg)
+      sim <- add_equity_scores(sim)
+      
+      if (any(is.na(sim$equity_score))) {
+        warning("Some users have missing equity scores. Check score table.")
+      }
+      
+      # Stakeholder group-level equity
+      group_equity <- sim %>%
+        group_by(gender, preference) %>%
+        summarise(
+          group_mean_score = mean(equity_score, na.rm = TRUE),
+          group_mean_wait = mean(waiting_time, na.rm = TRUE),
+          n_users = n(),
+          .groups = "drop"
+        )
+      
+      rawlsian_group_score <- min(group_equity$group_mean_score, na.rm = TRUE)
+      
+      worst_group <- group_equity %>%
+        arrange(group_mean_score) %>%
+        slice(1)
+      
+      # Gender-level summary
+      gender_summary <- sim %>%
+        group_by(gender) %>%
+        summarise(
+          gender_mean_wait = mean(waiting_time),
+          gender_p90_wait = as.numeric(quantile(waiting_time, 0.90)),
+          gender_mean_equity_score = mean(equity_score, na.rm = TRUE),
+          gender_pct_completed_25 = mean(completion_time <= intermission_length) * 100,
+          .groups = "drop"
+        )
+      
+      women_wait <- gender_summary %>%
+        filter(gender == "Women") %>%
+        pull(gender_mean_wait)
+      
+      men_wait <- gender_summary %>%
+        filter(gender == "Men") %>%
+        pull(gender_mean_wait)
+      
+      gender_wait_gap <- women_wait - men_wait
+      
+      # Overall configuration results
+      config_results[[counter]] <- sim %>%
+        summarise(
+          scenario = scenario_name,
+          replication = r,
+          config = cfg,
+          
+          mean_wait = mean(waiting_time),
+          median_wait = median(waiting_time),
+          p90_wait = as.numeric(quantile(waiting_time, 0.90)),
+          max_wait = max(waiting_time),
+          pct_completed_25 = mean(completion_time <= intermission_length) * 100,
+          n_unserved_25 = sum(completion_time > intermission_length),
+          
+          gender_wait_gap = gender_wait_gap,
+          totalitarian_score = mean(equity_score, na.rm = TRUE),
+          rawlsian_group_score = rawlsian_group_score,
+          
+          worst_group_gender = worst_group$gender,
+          worst_group_preference = worst_group$preference,
+          worst_group_mean_score = worst_group$group_mean_score,
+          worst_group_mean_wait = worst_group$group_mean_wait
+        )
+      
+      # Gender-level results
+      gender_results[[counter]] <- gender_summary %>%
+        mutate(
+          scenario = scenario_name,
+          replication = r,
+          config = cfg
+        )
+      
+      # Stakeholder group-level results
+      group_equity_results[[counter]] <- group_equity %>%
+        mutate(
+          scenario = scenario_name,
+          replication = r,
+          config = cfg
+        )
+      
+      counter <- counter + 1
+    }
+  }
+}
+
+config_results <- bind_rows(config_results)
+gender_results <- bind_rows(gender_results)
+group_equity_results <- bind_rows(group_equity_results)
+
+config_results$scenario <- factor(
+  config_results$scenario,
+  levels = levels(stage2_scenarios$scenario)
+)
+
+gender_results$scenario <- factor(
+  gender_results$scenario,
+  levels = levels(stage2_scenarios$scenario)
+)
+
+group_equity_results$scenario <- factor(
+  group_equity_results$scenario,
+  levels = levels(stage2_scenarios$scenario)
+)
+
+config_results$config <- factor(
+  config_results$config,
+  levels = c("Status Quo", "All Unisex", "Hybrid Model")
+)
+
+gender_results$config <- factor(
+  gender_results$config,
+  levels = c("Status Quo", "All Unisex", "Hybrid Model")
+)
+
+group_equity_results$config <- factor(
+  group_equity_results$config,
+  levels = c("Status Quo", "All Unisex", "Hybrid Model")
+)
+
+# ============================================================
+# 9. Summary tables
+# ============================================================
+
+summary_stage2 <- config_results %>%
+  group_by(scenario, config) %>%
+  summarise(
+    mean_wait = mean(mean_wait),
+    median_wait = mean(median_wait),
+    p90_wait = mean(p90_wait),
+    avg_max_wait = mean(max_wait),
+    pct_completed_25 = mean(pct_completed_25),
+    avg_n_unserved_25 = mean(n_unserved_25),
+    gender_wait_gap = mean(gender_wait_gap),
+    totalitarian_score = mean(totalitarian_score),
+    rawlsian_group_score = mean(rawlsian_group_score),
+    worst_group_mean_wait = mean(worst_group_mean_wait),
+    .groups = "drop"
+  ) %>%
+  arrange(scenario, mean_wait)
+
+print(summary_stage2, width = Inf)
+
+summary_gender_stage2 <- gender_results %>%
+  group_by(scenario, config, gender) %>%
+  summarise(
+    mean_wait = mean(gender_mean_wait),
+    p90_wait = mean(gender_p90_wait),
+    mean_equity_score = mean(gender_mean_equity_score),
+    pct_completed_25 = mean(gender_pct_completed_25),
+    .groups = "drop"
+  ) %>%
+  arrange(scenario, config, gender)
+
+print(summary_gender_stage2, width = Inf)
+
+summary_group_equity_stage2 <- group_equity_results %>%
+  group_by(scenario, config, gender, preference) %>%
+  summarise(
+    mean_equity_score = mean(group_mean_score, na.rm = TRUE),
+    mean_wait = mean(group_mean_wait, na.rm = TRUE),
+    mean_n_users = mean(n_users),
+    .groups = "drop"
+  ) %>%
+  arrange(scenario, config, mean_equity_score)
+
+print(summary_group_equity_stage2, width = Inf)
+
+# ============================================================
+# 10. Decision table
+# ============================================================
+
+decision_stage2 <- summary_stage2 %>%
+  group_by(scenario) %>%
+  mutate(
+    operational_rank = rank(mean_wait, ties.method = "min"),
+    totalitarian_rank = rank(-totalitarian_score, ties.method = "min"),
+    rawlsian_rank = rank(-rawlsian_group_score, ties.method = "min")
+  ) %>%
+  ungroup() %>%
+  select(
+    scenario,
+    config,
+    mean_wait,
+    p90_wait,
+    pct_completed_25,
+    gender_wait_gap,
+    totalitarian_score,
+    rawlsian_group_score,
+    operational_rank,
+    totalitarian_rank,
+    rawlsian_rank
+  ) %>%
+  arrange(scenario, operational_rank)
+
+print(decision_stage2, width = Inf)
+
+# ============================================================
+# 11. Plot: Mean waiting time by scenario
+# ============================================================
+
+plot_wait_scenario <- config_results %>%
+  group_by(scenario, config) %>%
+  summarise(
+    mean = mean(mean_wait),
+    se = sd(mean_wait) / sqrt(n()),
+    lower = mean - 1.96 * se,
+    upper = mean + 1.96 * se,
+    .groups = "drop"
+  )
+
+ggplot(plot_wait_scenario, aes(x = config, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  facet_wrap(~ scenario) +
+  labs(
+    title = "Mean Waiting Time Across Stage 2 Stress Tests",
+    x = "Configuration",
+    y = "Mean Waiting Time (minutes)"
+  )
+
+
+# ============================================================
+# 12. Plot: Percentage completed within 25 minutes
+# ============================================================
+
+plot_completion <- config_results %>%
+  group_by(scenario, config) %>%
+  summarise(
+    mean = mean(pct_completed_25),
+    se = sd(pct_completed_25) / sqrt(n()),
+    lower = mean - 1.96 * se,
+    upper = mean + 1.96 * se,
+    .groups = "drop"
+  )
+
+ggplot(plot_completion, aes(x = config, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  facet_wrap(~ scenario) +
+  labs(
+    title = "Percentage Completed Within 25 Minutes Across Stage 2 Stress Tests",
+    x = "Configuration",
+    y = "Completed Within Intermission (%)"
+  )
+
+
+plot_gender_wait <- gender_results %>%
+  group_by(scenario, config, gender) %>%
+  summarise(
+    mean = mean(gender_mean_wait),
+    se = sd(gender_mean_wait) / sqrt(n()),
+    lower = mean - 1.96 * se,
+    upper = mean + 1.96 * se,
+    .groups = "drop"
+  )
+
+# ============================================================
+# 13. Plot: Mean waiting time by gender
+# ============================================================
+
+ggplot(plot_gender_wait, aes(x = config, y = mean, fill = gender)) +
+  geom_col(position = position_dodge(width = 0.8)) +
+  geom_errorbar(
+    aes(ymin = lower, ymax = upper),
+    position = position_dodge(width = 0.8),
+    width = 0.2
+  ) +
+  facet_wrap(~ scenario) +
+  labs(
+    title = "Mean Waiting Time by Gender Across Stage 2 Stress Tests",
+    x = "Configuration",
+    y = "Mean Waiting Time (minutes)",
+    fill = "Gender"
+  )
+
+
+# ============================================================
+# 14. Plot: Gender waiting-time gap by scenario
+# ============================================================
+
+plot_gender_gap <- config_results %>%
+  group_by(scenario, config) %>%
+  summarise(
+    mean = mean(gender_wait_gap),
+    se = sd(gender_wait_gap) / sqrt(n()),
+    lower = mean - 1.96 * se,
+    upper = mean + 1.96 * se,
+    .groups = "drop"
+  )
+
+ggplot(plot_gender_gap, aes(x = config, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  facet_wrap(~ scenario) +
+  labs(
+    title = "Gender Waiting-Time Gap Across Stage 2 Stress Tests",
+    x = "Configuration",
+    y = "Women Mean Wait - Men Mean Wait (minutes)"
+  )
+
+
+# ============================================================
+# 15. Plot: Totalitarian equity score by scenario
+# ============================================================
+
+plot_totalitarian <- config_results %>%
+  group_by(scenario, config) %>%
+  summarise(
+    mean = mean(totalitarian_score),
+    se = sd(totalitarian_score) / sqrt(n()),
+    lower = mean - 1.96 * se,
+    upper = mean + 1.96 * se,
+    .groups = "drop"
+  )
+
+ggplot(plot_totalitarian, aes(x = config, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  facet_wrap(~ scenario) +
+  labs(
+    title = "Totalitarian Equity Score Across Stage 2 Stress Tests",
+    x = "Configuration",
+    y = "Average Equity Score"
+  )
+
+
+# ============================================================
+# 16. Plot: Rawlsian equity score by scenario
+# ============================================================
+
+plot_rawlsian <- config_results %>%
+  group_by(scenario, config) %>%
+  summarise(
+    mean = mean(rawlsian_group_score),
+    se = sd(rawlsian_group_score) / sqrt(n()),
+    lower = mean - 1.96 * se,
+    upper = mean + 1.96 * se,
+    .groups = "drop"
+  )
+
+ggplot(plot_rawlsian, aes(x = config, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  facet_wrap(~ scenario) +
+  labs(
+    title = "Rawlsian Equity Score Across Stage 2 Stress Tests",
+    x = "Configuration",
+    y = "Lowest Group Average Equity Score"
+  )
+```
