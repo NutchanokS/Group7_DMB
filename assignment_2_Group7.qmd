@@ -1346,7 +1346,7 @@ burst in first 5 minutes while 80% arrive is women
 ```{r}
 # ============================================================
 # Stage 2 Simulation:
-# Female-Dominant Burst + High Service-Time Variance
+# Early Female-Dominant Burst Stress Test
 # ============================================================
 
 library(dplyr)
@@ -1369,18 +1369,17 @@ expected_users <- total_arrival_rate * intermission_length
 
 configs <- c("Status Quo", "All Unisex", "Hybrid Model")
 
-# Stage 2 scenarios:
-# Both scenarios use the same female-dominant burst.
+# Stage 2 scenario:
+# 80% of restroom users arrive in the first 5 minutes.
+# Among this burst group, 80% are women.
 stage2_scenarios <- data.frame(
-  scenario = c(
-    "Female-dominant burst",
-    "Female-dominant burst + high service variance"
-  ),
-  early_prop = c(0.80, 0.80),
-  early_female_prop = c(0.80, 0.80),
-  late_female_prop = c(0.50, 0.50),
-  service_sd_multiplier = c(1.00, 1.50),
-  class2_prob = c(0.05, 0.10)
+  scenario = c("Early female-dominant burst"),
+  burst_timing = c("early"),
+  burst_prop = c(0.80),
+  burst_female_prop = c(0.80),
+  non_burst_female_prop = c(0.50),
+  class2_prob = c(0.05),
+  service_sd_multiplier = c(1.00)
 )
 
 stage2_scenarios
@@ -1408,9 +1407,10 @@ r_service_lognormal <- function(n, mean_service, sd_service) {
 # ============================================================
 
 generate_users <- function(
-    early_prop,
-    early_female_prop,
-    late_female_prop,
+    burst_timing,
+    burst_prop,
+    burst_female_prop,
+    non_burst_female_prop,
     service_sd_multiplier,
     class2_prob
 ) {
@@ -1422,37 +1422,60 @@ generate_users <- function(
   # Arrival times
   # -----------------------------
   
-  n_early <- round(N * early_prop)
-  n_late <- N - n_early
+  n_burst <- round(N * burst_prop)
+  n_non_burst <- N - n_burst
   
-  # 80% arrive in first 5 minutes
-  early_arrivals <- runif(n_early, min = 0, max = 5)
-  
-  # remaining 20% arrive from minute 5 to 25
-  late_arrivals <- runif(n_late, min = 5, max = intermission_length)
+  if (burst_timing == "early") {
+    
+    # 80% arrive in first 5 minutes
+    burst_arrivals <- runif(n_burst, min = 0, max = 5)
+    
+    # remaining 20% arrive between minute 5 and 25
+    non_burst_arrivals <- runif(
+      n_non_burst,
+      min = 5,
+      max = intermission_length
+    )
+    
+  } else if (burst_timing == "late") {
+    
+    # remaining 20% arrive between minute 0 and 20
+    non_burst_arrivals <- runif(
+      n_non_burst,
+      min = 0,
+      max = intermission_length - 5
+    )
+    
+    # 80% arrive in last 5 minutes
+    burst_arrivals <- runif(
+      n_burst,
+      min = intermission_length - 5,
+      max = intermission_length
+    )
+  }
   
   # -----------------------------
   # Gender mix
   # -----------------------------
   
-  early_gender <- sample(
+  burst_gender <- sample(
     c("Women", "Men"),
-    size = n_early,
+    size = n_burst,
     replace = TRUE,
-    prob = c(early_female_prop, 1 - early_female_prop)
+    prob = c(burst_female_prop, 1 - burst_female_prop)
   )
   
-  late_gender <- sample(
+  non_burst_gender <- sample(
     c("Women", "Men"),
-    size = n_late,
+    size = n_non_burst,
     replace = TRUE,
-    prob = c(late_female_prop, 1 - late_female_prop)
+    prob = c(non_burst_female_prop, 1 - non_burst_female_prop)
   )
   
   users <- data.frame(
     user_id = 1:N,
-    arrival_time = c(early_arrivals, late_arrivals),
-    gender = c(early_gender, late_gender)
+    arrival_time = c(burst_arrivals, non_burst_arrivals),
+    gender = c(burst_gender, non_burst_gender)
   )
   
   # -----------------------------
@@ -1795,21 +1818,23 @@ counter <- 1
 for (s in 1:nrow(stage2_scenarios)) {
   
   scenario_name <- stage2_scenarios$scenario[s]
-  early_prop_s <- stage2_scenarios$early_prop[s]
-  early_female_prop_s <- stage2_scenarios$early_female_prop[s]
-  late_female_prop_s <- stage2_scenarios$late_female_prop[s]
+  burst_timing_s <- stage2_scenarios$burst_timing[s]
+  burst_prop_s <- stage2_scenarios$burst_prop[s]
+  burst_female_prop_s <- stage2_scenarios$burst_female_prop[s]
+  non_burst_female_prop_s <- stage2_scenarios$non_burst_female_prop[s]
   sd_multiplier_s <- stage2_scenarios$service_sd_multiplier[s]
   class2_prob_s <- stage2_scenarios$class2_prob[s]
   
   for (r in 1:n_rep) {
     
     users_r <- generate_users(
-      early_prop = early_prop_s,
-      early_female_prop = early_female_prop_s,
-      late_female_prop = late_female_prop_s,
+      burst_timing = burst_timing_s,
+      burst_prop = burst_prop_s,
+      burst_female_prop = burst_female_prop_s,
+      non_burst_female_prop = non_burst_female_prop_s,
       service_sd_multiplier = sd_multiplier_s,
       class2_prob = class2_prob_s
-    )
+      )
     
     for (cfg in configs) {
       
@@ -1863,6 +1888,10 @@ for (s in 1:nrow(stage2_scenarios)) {
           scenario = scenario_name,
           replication = r,
           config = cfg,
+
+           burst_timing = burst_timing_s,
+           burst_prop = burst_prop_s,
+           burst_female_prop = burst_female_prop_s,
           
           mean_wait = mean(waiting_time),
           median_wait = median(waiting_time),
