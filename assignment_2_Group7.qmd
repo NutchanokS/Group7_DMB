@@ -437,6 +437,224 @@ What does it mean for management, and what should they do?
     -   Extra tables/figures
     -   References
 
+\newpage
+
+Simulation
+burst in early 5 minutes while 80% arrive is Men
+
+```{r}
+# =============================================================
+# SIMULATION SCENARIO 1: MALE DOMINANT (80%), EARLY BURST (500 Reps)
+# =============================================================
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+set.seed(123) # For consistency in results
+n_rep <- 500
+
+# --- 1. Scenario-Specific Arrival Parameters ---
+# Total patrons based on baseline rates: (3.2 + 3.2) * 25 = 160
+intermission_dur <- 25
+lambda_total  <- (total_arrival_women + total_arrival_men) * intermission_dur 
+perc_male      <- 0.80  # Scenario 1 Stress Test Constraint
+perc_burst     <- 0.80  # 80% arrival in burst window
+burst_window   <- 5     # First 5 minutes
+
+# --- 2. Helper Function: Discrete Event Simulation (DES) for Multi-Fixture Queues ---
+# This function calculates wait times for a specific queue/facility
+simulate_des_queue <- function(arrival_times, service_times, k) {
+  if(length(arrival_times) == 0) return(numeric(0))
+  n <- length(arrival_times)
+  # Track fixture availability
+  completion_times <- rep(0, k)
+  wait_times <- numeric(length(arrival_times))
+  
+  for(i in seq_along(arrival_times)) {
+    # Find the earliest available fixture
+    available_at <- min(completion_times)
+    idx <- which.min(completion_times)
+    # Wait is the gap between arrival and fixture availability
+    wait_times[i] <- max(0, available_at - arrival_times[i])
+    completion_times[idx] <- arrival_times[i] + wait_times[i] + service_times[i]
+  }
+  return(wait_times)
+}
+
+# Helper to get individual scores row by row
+calc_scores <- function(waits, genders, prefs, uses) {
+    if(length(waits) == 0) return(numeric(0))
+    # Preference is assumed GS/NP for stress test based on your route assignment
+    mapply(get_score, waits, genders, prefs, MoreArgs = list(uses=uses))
+}
+
+# --- 3. Main Replication Loop ---
+rep_results <- list()
+
+for (r in 1:n_rep) {
+# a. Poisson Crowd Size
+N <- rpois(1, lambda = lambda_total)
+  
+# b. Generate Arrival Times (Early Burst Logic)
+n_burst  <- round(N * perc_burst)
+n_steady <- N - n_burst
+
+# c. Use runif to distribute arrivals within windows, then sort
+arrival_times <- c(sort(runif(n_burst, 0, burst_window)), 
+                   sort(runif(n_steady, burst_window, intermission_dur)))
+
+# d. Create Patron Population using Stage 1 Probabilities (Scenario 1: 80% Male Dominant)
+patrons_r <- data.frame(
+  id           = 1:N,
+  arrival_time = arrival_times,
+  # Assign Gender (80% Male for Scenario 1)
+  gender       = sample(c("M", "W"), N, replace = TRUE, 
+                        prob = c(perc_male, 1-perc_male)),
+  # Assign Class 2 status (5% probability from Stage 1)
+  is_c2  = sample(c(TRUE, FALSE), N, replace = TRUE, prob = c(prob_women_class2, 1-prob_women_class2)),
+  # Assign specific preference for accurate scoring
+  pref   = sample(c("GS", "NP", "UX"), N, replace = TRUE, prob = c(0.70, 0.21, 0.09))
+)
+
+  # Assign Route for Config 3 based on preference logic
+  # 1. Start by assuming everyone follows their preference
+  patrons_r$route <- patrons_r$pref
+  # 2. Identify users with "No Preference" (NP)
+  np_idx <- which(patrons_r$pref == "NP")
+  # 3. Only those users 50:50 to choose GS or UX
+  if(length(np_idx) > 0) {
+    patrons_r$route[np_idx] <- sample(c("GS", "UX"), length(np_idx), 
+                                      replace = TRUE, prob = c(0.5, 0.5))
+  }
+
+# 4. Pre-generate individual service times (Gamma Dist)
+  patrons_r <- patrons_r %>%
+    mutate(
+      mu = case_when(
+        gender == "W" & !is_c2 ~ service_mean_women_class1,
+        gender == "W" &  is_c2 ~ service_mean_women_class2,
+        gender == "M" & !is_c2 ~ service_mean_men_class1,
+        gender == "M" &  is_c2 ~ service_mean_men_class2
+      ),
+      sigma = case_when(
+        gender == "W" & !is_c2 ~ service_sigma_women_class1,
+        gender == "W" &  is_c2 ~ service_sigma_women_class2,
+        gender == "M" & !is_c2 ~ service_sigma_men_class1,
+        gender == "M" &  is_c2 ~ service_sigma_men_class2
+      ),
+      # Shape/Scale parameters for Gamma
+      shape = (mu/sigma)^2,
+      scale = sigma^2/mu,
+      service_time = rgamma(n(), shape = shape, scale = scale)
+    )
+
+
+# 5. Execute Stress Tests for All Configurations
+
+# --- Config 1: Status Quo (Segregated) ---
+# Women use 20 stalls (Pooled C1/C2 as they share stalls)
+# Men use 10 Urinals (C1) and 10 Stalls (C2)
+w_c1  <- patrons_r %>% filter(gender == "W")
+m_u1  <- patrons_r %>% filter(gender == "M" & !is_c2)
+m_s1  <- patrons_r %>% filter(gender == "M" &  is_c2)
+  
+wait_w_c1 <- simulate_des_queue(w_c1$arrival_time, w_c1$service_time, 20)
+wait_mu_c1 <- simulate_des_queue(m_u1$arrival_time, m_u1$service_time, 10)
+wait_ms_c1 <- simulate_des_queue(m_s1$arrival_time, m_s1$service_time, 10)
+  
+# --- Config 2: All Unisex (40 Universal Stalls) ---
+# Everyone shares one queue for 40 fixtures
+wait_c2 <- simulate_des_queue(patrons_r$arrival_time, patrons_r$service_time, 40)
+
+# --- Config 3: Hybrid (15W + 10 Urinal + 5 M-Stall + 10 UX) ---
+w_gs_c3  <- patrons_r %>% filter(gender == "W" & route == "GS")
+mu_gs_c3 <- patrons_r %>% filter(gender == "M" & !is_c2 & route == "GS")
+ms_gs_c3 <- patrons_r %>% filter(gender == "M" &  is_c2 & route == "GS")
+u_ux_c3  <- patrons_r %>% filter(route == "UX")
+  
+wait_w_c3  <- simulate_des_queue(w_gs_c3$arrival_time, w_gs_c3$service_time, 15)
+wait_mu_c3 <- simulate_des_queue(mu_gs_c3$arrival_time, mu_gs_c3$service_time, 10)
+wait_ms_c3 <- simulate_des_queue(ms_gs_c3$arrival_time, ms_gs_c3$service_time, 5)
+wait_ux_c3 <- simulate_des_queue(u_ux_c3$arrival_time, u_ux_c3$service_time, 10)
+  
+# 6. Calculate Fairness Scores for this replication
+# (Simplification: Assign the scores to the lists before averaging)
+rep_results[[r]] <- data.frame(
+    replication = r,
+    config = c("Status Quo", "All Unisex", "Hybrid Model"),
+    mean_wait = c(mean(c(wait_w_c1, wait_mu_c1, wait_ms_c1)), 
+                  mean(wait_c2), 
+                  mean(c(wait_w_c3, wait_mu_c3, wait_ms_c3, wait_ux_c3))),
+    totalitarian = c(
+      mean(c(calc_scores(wait_w_c1, "W", w_c1$pref, "GS"), 
+             calc_scores(wait_mu_c1, "M", m_u1$pref, "GS"), 
+             calc_scores(wait_ms_c1, "M", m_s1$pref, "GS"))),
+      mean(calc_scores(wait_c2, patrons_r$gender, patrons_r$pref, "UX")),
+      mean(c(calc_scores(wait_w_c3, "W", w_gs_c3$pref, "GS"), 
+             calc_scores(wait_mu_c3, "M", mu_gs_c3$pref, "GS"), 
+             calc_scores(wait_ms_c3, "M", ms_gs_c3$pref, "GS"), 
+             calc_scores(wait_ux_c3, u_ux_c3$gender, u_ux_c3$pref, "UX")))
+    ),
+    # Rawlsian: Include ALL groups (Women, Men C1, Men C2)
+    rawlsian = c(
+      # Checks Women, Men urinals, and Men stalls
+      min(mean(calc_scores(wait_w_c1, "W", w_c1$pref, "GS")), 
+          mean(calc_scores(wait_mu_c1, "M", m_u1$pref, "GS")), 
+          mean(calc_scores(wait_ms_c1, "M", m_s1$pref, "GS")), na.rm = TRUE),
+      # Checks Women vs Men in the pooled line
+      min(mean(calc_scores(wait_c2[patrons_r$gender=="W" & !patrons_r$is_c2], "W", patrons_r$pref[patrons_r$gender=="W" & !patrons_r$is_c2], "UX")),
+          mean(calc_scores(wait_c2[patrons_r$gender=="W" &  patrons_r$is_c2], "W", patrons_r$pref[patrons_r$gender=="W" &  patrons_r$is_c2], "UX")),
+          mean(calc_scores(wait_c2[patrons_r$gender=="M" & !patrons_r$is_c2], "M", patrons_r$pref[patrons_r$gender=="M" & !patrons_r$is_c2], "UX")),
+          mean(calc_scores(wait_c2[patrons_r$gender=="M" &  patrons_r$is_c2], "M", patrons_r$pref[patrons_r$gender=="M" &  patrons_r$is_c2], "UX")), na.rm = TRUE),
+      # Checks Women-GS, Men-GS-Urinals, Men-GS-Stalls, and Unisex route
+      min(mean(calc_scores(wait_w_c3, "W", w_gs_c3$pref, "GS")), 
+          mean(calc_scores(wait_mu_c3, "M", mu_gs_c3$pref, "GS")), 
+          mean(calc_scores(wait_ms_c3, "M", ms_gs_c3$pref, "GS")),
+          mean(calc_scores(wait_ux_c3, u_ux_c3$gender, u_ux_c3$pref, "UX")), na.rm = TRUE)
+    )
+  )
+}  
+
+# =============================================================
+# 7. SUMMARY TABLE
+# =============================================================
+full_results <- bind_rows(rep_results)
+summary_table <- full_results %>% group_by(config) %>% 
+  summarise(Avg_Wait = mean(mean_wait, na.rm = TRUE), 
+            Totalitarian = mean(totalitarian, na.rm = TRUE), 
+            Rawlsian = mean(rawlsian, na.rm = TRUE))
+
+print(kable(summary_table))
+
+# =============================================================
+# 8. DECISION TABLE (Ranking)
+# =============================================================
+decision_table <- summary_table %>%
+  mutate(Wait_Rank = rank(Avg_Wait), Social_Welfare_Rank = rank(-Totalitarian), Justice_Rank = rank(-Rawlsian)) %>%
+  arrange(Wait_Rank)
+
+print(kableExtra::kable(decision_table))
+
+# =============================================================
+# 9. PLOTS
+# =============================================================
+
+# Plot 1: Mean Waiting Time Comparison
+ggplot(summary_table, aes(x = config, y = Avg_Wait, fill = config)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Scenario 1: Mean Waiting Time by Configuration",
+       subtitle = "Early Burst, 80% Male Dominant",
+       y = "Minutes", x = "")
+
+# Plot 2: Fairness Trade-off (Totalitarian vs Rawlsian)
+ggplot(summary_table, aes(x = Totalitarian, y = Rawlsian, color = config)) +
+  geom_point(size = 5) +
+  theme_minimal() +
+  labs(title = "Equity Trade-off: Totalitarian vs. Rawlsian",
+       x = "Total Social Welfare (Tr)", y = "Worst-off Group Score (Mr)")
+```
+
 
 \newpage
 
