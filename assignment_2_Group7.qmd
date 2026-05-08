@@ -1291,16 +1291,9 @@ run_one_replication <- function(rep_id, np_to_gs = 0.5) {
     prob_class2_scenario = 0.05
   )
   
-  users_diverse <- generate_stage2_users(
-    rep_id = rep_id + 10000,
-    scenario = "Diverse service needs",
-    arrival_pattern = "baseline",
-    prob_class2_scenario = 0.50
-  )
-  
-  results <- bind_rows(
-    run_all_configurations(users_burst, np_to_gs = np_to_gs),
-    run_all_configurations(users_diverse, np_to_gs = np_to_gs)
+  results <- run_all_configurations(
+    users_burst,
+    np_to_gs = np_to_gs
   )
   
   summarise_one_rep(results)
