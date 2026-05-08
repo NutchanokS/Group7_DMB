@@ -661,8 +661,6 @@ ggplot(summary_table, aes(x = Totalitarian, y = Rawlsian, color = config)) +
 Simulation
 burst in last 5 minutes while 80% arrive is women
 
-Sevice time variance increase by class 2 probability increase from 0.05 to 0.5
-
 ```{r}
 #| label: setup-and-parameters
 #| include: false
@@ -810,7 +808,6 @@ get_capacity <- function(config) {
 
 # ============================================================
 # Stage 1: M/G/k analytical model
-# This follows the GGK function style from the workshop.
 # M/G/k is obtained by setting cv_arrival = 1.
 # ============================================================
 
