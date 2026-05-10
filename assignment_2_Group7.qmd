@@ -80,21 +80,317 @@ knitr::opts_chunk$set(echo = TRUE, eval=TRUE, error=TRUE, cache=FALSE)
 
 # 1. Introduction and background
 
-During performances, the concert hall has a strict 25-minute intermission. This short period can create a sudden rush to restroom facilities and cause serious congestion. Management has received increasing complaints about long waiting times and the lack of inclusive restroom design. Therefore, this problem is not only about reducing queues, but also about improving fairness and accessibility for different users.
+## 1.1 The Business Problem
 
-Historical observations show that restroom users do not all behave in the same way. Users can have different service-time needs and different preferences for restroom types. Some users prefer gender-segregated facilities, some have no strong preference, and some prefer unisex facilities. Because of this, the best restroom design should not only have shorter average waiting times, but should also consider whether different user groups are treated fairly.
+A high-capacity concert hall operates under a strict 25-minute intermission window. This compressed break triggers a simultaneous surge in demand as patrons rush to restroom facilities, creating severe congestion and extended queues. Management has received an increasing volume of complaints regarding long wait times and the lack of an inclusive restroom design, a pattern that risks damaging the venue's reputation and driving away repeat customers.
 
-This report evaluates three possible restroom configurations: the Status Quo, the All Unisex model, and the Hybrid model. The analysis uses queueing theory to estimate waiting-time performance, simulation to test more realistic intermission conditions, and fairness measures to compare the experience of different user groups.
+The challenge is compounded by strict physical and financial constraints. The total restroom capacity is fixed at 40 units with no structural expansion permitted. Any redesign must therefore work within this fixed envelope. The question is not how many units to build, but how to allocate the existing 40 most effectively. This report provides management with a rigorous, data-driven analysis to support that decision.
 
-The three configurations evaluated in this report are:
+## 1.2 Stakeholders, Costs, and Benefits
 
-1.  **Status Quo**: 20 women’s stalls, 10 men’s urinals, and 10 men’s stalls.
-2.  **All Unisex**: 40 universal all-gender stalls.
-3.  **Hybrid Model**: 15 women’s stalls, 10 men’s urinals, 5 men’s stalls, and 10 unisex stalls.
+This restroom configuration challenge directly affects patrons and the venue's operational management in distinct ways.
 
-The aim of this report is to provide management with a clear recommendation about which configuration should be used. The recommended design should reduce congestion during intermission while also supporting a more inclusive restroom system.
+Women patrons on average require longer service times and may face disproportionate waiting burdens under layouts that underallocate stall capacity to them. Men patrons use a combination of urinals and stalls with shorter average service times but remain subject to congestion under peak demand. 
+
+Beyond service time differences, patron preferences for facility type also vary. Some strongly prefer gender-segregated spaces for privacy, while others rely on unisex facilities for comfort and inclusivity. A layout that ignores this diversity risks excluding a portion of the audience entirely. Importantly, facility preference is not merely a matter of convenience. For some patrons, access to an appropriate facility is tied to their sense of dignity and personal identity, making inclusive design a matter of basic respect rather than optional comfort.
+
+Event organisers and venue management represent another stakeholder group. The gender composition of an audience is not fixed. It is shaped by the nature of the performance, and organisers who programme events targeting a specific demographic directly influence the demand profile the restroom system must handle. A venue that cannot accommodate varied audience compositions reliably will face operational failures across different event types, not only under its current programming.
+
+The costs of inaction are tangible and immediate. Patrons who cannot complete their restroom visit within the intermission window risk missing the opening minutes of the next act, a direct degradation of the experience they paid for. Beyond this, sustained queuing reduces time available for concession spending, lowers overall satisfaction scores, and increases the likelihood that patrons do not return for future events. A well-designed reallocation, achievable at no additional construction cost, offers equally concrete benefits. Shorter queues allow patrons to return to their seats on time, spend more at concession stands, leave with a better impression of the venue, and are more likely to attend again.
+
+## 1.3 The Fairness Lens and Analytical Scope
+
+Because patron service times and facility preferences differ across groups, a layout optimised purely for aggregate efficiency can still leave one group suffering disproportionately long delays while another experiences none. This is the central tension that the patron complaints reflect. It is not simply that queues are long overall, but that the burden falls unevenly.
+
+For this reason, our analysis adopts Direction A: Fairness and Stakeholder Disparity as its primary lens, directly motivated by the patron complaints that management has received, which point not only to long overall queues but to the unequal burden placed on specific patron groups. Each configuration is evaluated through two complementary frameworks: a Totalitarian approach that maximises overall average satisfaction across all patrons, and a Rawlsian approach that prioritises the experience of the worst-off group. Together, these allow us to identify designs that are both collectively effective and locally equitable.
+
+## 1.4 Evaluated Configurations and Report Objectives
+
+To identify the optimal allocation within the 40-unit constraint, this report evaluates three distinct restroom configurations:
+
+- Configuration 1 — Status Quo (Gender-Segregated Baseline): 20 women's stalls, 10 men's urinals, and 10 men's stalls. This serves as the comparative baseline representing current operations.
+
+- Configuration 2 — All Unisex (Fully Integrated): All 40 units converted to universal all-gender stalls, maximising resource pooling across all patron groups.
+
+- Configuration 3 — Hybrid Model (Compromise Allocation): 15 women's stalls, 10 men's urinals, 5 men's stalls, and 10 unisex stalls, combining the efficiency of shared spaces with dedicated private areas.
+
+The analysis proceeds in two stages. First, steady-state queueing analysis establishes the baseline performance of each configuration under standard operating conditions. Second, each configuration is stress-tested through simulation under dynamic arrival scenarios, including cases where audience gender composition is heavily skewed toward one group, as naturally occurs when event demographics vary significantly across different performances. 
+
+This two-stage approach ensures that recommendations hold not only under ideal conditions but under the realistic pressures a working venue faces across its event calendar, with the ultimate objective of providing management with a clear, evidence-based recommendation on which configuration best minimises intermission queuing disruptions while delivering a fair and inclusive experience for all patrons.
+
+\newpage
 
 # 2. Analytical Methods
+
+The central analytics problem is to determine which restroom configuration minimises patron waiting time and maximises equitable satisfaction across stakeholder groups, subject to the fixed 40-unit capacity constraint and the strict 25-minute intermission window.
+
+To robustly evaluate the three restroom configurations, this study employs a two-stage analytical framework. We transition from a highly structured, static queueing model to a dynamic, stochastic simulation designed to stress-test the configurations under realistic, peak-demand intermission pressures.
+
+[xxx-placeholder for visual flowchart of the two-stage analytical framework-xxx]
+
+The primary measures of success for this analysis are: (1) Totalitarian Satisfaction Score (Tr), measuring aggregate patron satisfaction across all groups; (2) Rawlsian Satisfaction Score (Mr), measuring the satisfaction of the worst-off patron group; and (3) Queue Failure Rate, measuring the proportion of patrons unable to complete their restroom visit within the intermission window.
+
+## 2.1 Stage 1: Steady-State Modeling
+
+We begin by establishing a theoretical baseline using analytical queueing equations. To set a clean, idealised benchmark, Stage 1 assumes a perfectly balanced 50:50 gender demographic split and a uniform Poisson arrival rate throughout the intermission, meaning patrons arrive at a constant average rate (λ) over the entire break with no sudden rushes.
+
+**Analytical Inputs, Outputs, and Assumptions**
+
+The Stage 1 model is built on the following inputs, outputs, and assumptions:
+
+| | Detail |
+|---|---|
+| **Inputs** | Arrival rate (λ = 6.4 patrons/minute), gender demographic split (50:50 under baseline conditions), and empirical service time parameters (mean and standard deviation) drawn from the case data for each patron class |
+| **Outputs** | Expected waiting time in queue (Wq) and server utilisation (ρ) for each configuration |
+| **Assumptions** | Poisson arrivals, infinite queue capacity, FIFO service discipline, independence between segregated queues, and Gamma-distributed service times parameterised from the empirical case data |
+
+Note that this table covers Stage 1 only. Stage 2 inputs, outputs, and assumptions are addressed within 2.2 and 2.3 respectively, since the simulation introduces additional parameters that are best explained in context.
+
+To model this baseline with mathematical rigour, we leverage the historical data provided in the case description, which includes the empirical mean service time and standard deviation (σ) for different restroom activities. With these explicit parameters, we can calculate the exact service time coefficient of variation (CV = σ/Mean). Because the empirical service time data yields a coefficient of variation CV ≠ 1, the M/G/k model is adopted as the most appropriate baseline, with the Allen-Cunneen approximation used to compute expected waiting times.
+
+The M/G/k queueing model (Poisson Arrivals, General Service Times, k Servers) computes the expected waiting time in queue (Wq) under steady-state conditions as follows:
+
+$$W_q(M/G/k) \approx \frac{C_a^2 + C_s^2}{2} ⨯ W_q(M/M/k)$$
+
+Where:
+
+* $C_a^2$ is the arrival CV ($1.0$ due to our perfect Poisson arrival assumption).
+* $C_s^2$ is the service time CV, calculated directly from the provided historical mean and standard deviation.
+* $W_q(M/M/k)$ is the expected waiting time of a standard $M/M/k$ system.
+
+### Application to the Three Configurations
+
+We apply this $M/G/k$ mathematical framework to evaluate the expected waiting times across our three layouts:
+
+* **Configuration 1 (Status Quo):** Modeled as completely segregated, independent parallel queues. The female stalls and male facilities (urinals and stalls) operate as separate systems with their own dedicated arrival rates and capacities ($k_w = 20$, $k_m = 10$).
+[placeholder for illustration of Configuration 1 queueing model]
+
+* **Configuration 2 (All Unisex):** Modeled as a single, fully integrated system where all $k = 40$ units are pooled. Patrons join a single virtual queue, and we calculate the waiting time using a combined, weighted average service rate based on the 50:50 gender split.
+[placeholder for illustration of Configuration 2 queueing model]
+
+* **Configuration 3 (Hybrid Model):** Modeled as a combination of segregated and combined systems. The unisex units ($k_u = 10$) represent a pooled resource. For patrons with no facility preference, we assume a **50:50 split** in how they distribute themselves between the dedicated gender-segregated lines and the combined unisex lines. When appropriate, we analyze these as combined lines where waiting times are calculated based on this overlapping traffic flowing into the shared stall capacity.
+[placeholder for illustration of Configuration 3 queueing model]
+
+### Analytical Role of the Steady-State Baseline
+
+This initial steady-state analysis is used as a critical theoretical baseline to ensure that the 40-stall capacity is, at least theoretically, sufficient to accommodate the audience under perfect operating conditions. By proving that the system functions mathematically when arrivals are stable and uniform, we establish a baseline of viability. This sets the stage for Stage 2, where we can directly measure the impact of dynamic arrival shocks.
+
+## 2.2 Stage 2: Stress-Test Scenario Design
+
+To ensure our recommendations are resilient, we subject each restroom configuration to dynamic simulation testing. While the steady-state equations in Stage 1 establish baseline viability, real-world intermission behaviour is highly volatile. To make our simulation results directly comparable to our Stage 1 baseline, we keep the total volume of restroom demand constant.
+
+**Analytical Inputs, Outputs, and Assumptions**
+
+The Stage 2 simulation is built on the following inputs, outputs, and assumptions:
+
+| | Detail |
+|---|---|
+| **Inputs** | Total patron volume (N = 160), gender composition per scenario (80:20 or 20:80), arrival timing distribution across burst and tail phases, and service time parameters per patron class sampled from Gamma distributions |
+| **Outputs** | Individual waiting time (Wi), system time (Si), queue failure count, Totalitarian satisfaction score (Tr), and Rawlsian satisfaction score (Mr), with 95% confidence intervals computed across 500 replications |
+| **Assumptions** | Total patron volume is fixed at N = 160 across all runs to ensure comparability, FIFO service discipline applies throughout, patrons do not leave the queue once joined, no-preference patrons split 50:50 between dedicated and unisex facilities, service times are independent across patrons, and each replication uses an independent random seed |
+
+Based on the historical arrival rate established in the case data, the system experiences an average of 6.4 patrons arriving per minute. Over the course of the strict 25-minute intermission, this equates to a total simulated crowd of exactly:
+
+$$N = 6.4 \text{ patrons/minute} \times 25 \text{ minutes} = 160 \text{ patrons}$$
+
+To model the 80:20 timing shock, the 25-minute intermission is split into two sequential phases, each with its own Poisson arrival rate. Taking the Early Burst scenario as an illustration:
+
+The **Burst Phase** covers the first 5 minutes, during which 80% of patrons arrive:
+
+$$\lambda_{\text{burst}} = \frac{0.8 \times 160}{5} = \frac{128}{5} = 25.6 \text{ patrons/minute}$$
+
+The **Tail Phase** covers the remaining 20 minutes, during which the remaining 20% arrive:
+
+$$\lambda_{\text{tail}} = \frac{0.2 \times 160}{20} = \frac{32}{20} = 1.6 \text{ patrons/minute}$$
+
+For the Late Burst scenario, these phases are simply reversed: the low-intensity tail rate (λtail = 1.6) applies to the first 20 minutes, and the high-intensity burst rate (λburst = 25.6) applies to the final 5 minutes. The total patron volume remains N = 160 in both cases.
+
+While the total volume of patrons ($N = 160$) remains constant across all simulation runs to ensure a fair test, we introduce realistic "operational shocks" by applying the Pareto Principle ($80:20$ rule) to vary how this crowd is composed and when they arrive:
+
+### 1. Gender Demographic Mix
+
+The gender split of a crowd is rarely a perfect 50/50 and changes dramatically based on the event's genre:
+
+* **The Female Dominated Profile (80% Female / 20% Male):** Reflects events that draw heavily female-skewed audiences (such as certain kpop concerts), placing immense pressure on stall availability.
+
+* **The Male Dominated Profile (20% Female / 80% Male):** Reflects events with male-dominated demographics (such as certain rock concerts), shifting the operational burden heavily onto urinal throughput and male-allocated stalls.
+
+### 2. Arrival Timing Bursts
+
+Patrons do not arrive at a steady, uniform pace. Their timing is heavily influenced by queue anticipation and secondary intermission activities (such as purchasing refreshments or merchandise):
+
+* **The "Immediate Rush" (Early Burst):** $80\%$ of patrons rush to the restroom in the first $20\%$ of the intermission (the first 5 minutes). This represents a crowd eager to get the wait over with, testing how quickly a layout can drain an immediate, massive bottleneck.
+
+* **The "Postponed Rush" (Late Burst):** $80\%$ of patrons delay their visit, arriving in the final $20\%$ of the intermission (the last 5 minutes) because they spent the early break on other activities or to avoid what they assumed would be an initial line. This tests the system's susceptibility to severe queue failures as the 25-minute intermission deadline approaches.
+
+### The Four Experimental Scenarios
+
+By crossing these demographic profiles with the timing distributions, we establish four distinct stress-test scenarios:
+
+* **Scenario 1: Female Dominated with an Early Rush**
+
+*Parameters:* 80% Female / 20% Male audience; 80% of arrivals occur in the first 5 minutes.
+[placeholder for illustration of Scenario 1 arrival profile]
+
+
+* **Scenario 2: Female Dominated with a Late Rush**
+
+*Parameters:* 80% Female / 20% Male audience; 80% of arrivals occur in the final 5 minutes.
+[placeholder for illustration of Scenario 2 arrival profile]
+
+* **Scenario 3: Male Dominated with an Early Rush**
+
+*Parameters:* 20% Female / 80% Male audience; 80% of arrivals occur in the first 5 minutes.
+[placeholder for illustration of Scenario 3 arrival profile]
+
+* **Scenario 4: Male Dominated with a Late Rush**
+
+*Parameters:* 20% Female / 80% Male audience; 80% of arrivals occur in the final 5 minutes.
+[placeholder for illustration of Scenario 4 arrival profile]
+
+To ensure statistical reliability and smooth out stochastic variation, each of the 12 experimental combinations (3 Configurations in each of 4 Scenarios) is executed across 500 replications, allowing us to compute expected averages.
+
+## 2.3 Stage 2: Discrete-Event Simulation (DES) Architecture
+
+To execute the stress-test scenarios, we construct a stochastic Discrete-Event Simulation (DES) in R. This section details the technical framework of our simulation, shifting from *what* we are simulating to *how* the program executes. We design this engine using a modular process approach to manage the pipeline and code execution to model the differences in scenario's arrival profile and routing across the configurations.
+
+
+### 2.3.1 The Modular Process Approach
+
+The simulation engine is designed using a clean modular framework. To keep execution reproducible, we decouple the generation of patron data from the routing logic. This process is split into three core blocks wrapped inside a statistical replication loop:
+
+[xxx-placeholder for visual flowchart of code modularity-xxx]
+
+1. The Data-Generating Process (DGP)
+
+The DGP pre-calculates and locks down the exact attributes of all $N = 160$ arriving patrons before the simulation loop starts. This ensures that every configuration is tested against the exact same patron streams, removing stochastic noise from our structural comparisons. The DGP operates across two primary stages:
+
+- Arrival Time Generation: While Stage 1 assumes a single uniform Poisson arrival rate, Stage 2 applies the two-phase arrival structure derived in Section 2.2, using $λ_{burst}$ and $λ_{tail}$ to generate the appropriate number of arrivals across the burst and tail phases for each scenario.
+
+- Service Time and Attribute Assignment: For each of the 160 patrons, the DGP assigns a demographic gender, an operational class (defining their restroom needs), and an empirical facility privacy preference. Based on these variables, a unique service time ($T_s$) is sampled from a Gamma distribution (XXXor another agreed-upon continuous distribution style, to be finalized with the teamXXX).
+
+Since there are 4 scenarios, there are 4 distinct DGP versions generated to represent our 4 arrival profiles.
+
+2. The Queue-Routing (Simulation Loop)
+
+This part takes the pre-generated pool of 160 patrons and processes them second-by-second over the 25-minute timeline ($T = [0, 25]$ minutes). It tracks server availability using scoreboard vectors and manages queues under a strict First-In, First-Out (FIFO) discipline based on the following behavioral routing rules:
+
+- Class-Specific Routing: Class 1 male patrons (using urinals) are routed strictly to the 10 dedicated male urinals. The only exception is Class 1 males with a unisex preference, who may dynamically route to a unisex stall if it is free.
+
+- Preference Routing: Patrons with strong privacy/segregation preferences will only queue for their designated gender-segregated facilities.
+
+- No-Preference Routing: Patrons with no strong facility preference will dynamically choose between dedicated gender spaces and unisex spaces based on a 50:50 distribution rule (XXXto be finalized with the teamXXX).
+
+3. The Metrics Calculation
+
+Once a simulation run concludes, the calculation engine processes the raw output timestamps of all 160 patrons. It extracts key performance metrics for each individual and group, including:
+
+- Waiting Time ($W_i$): The time spent in queue before successfully entering a facility.
+
+- System Time ($S_i$): The total time spent in the restroom (wait time + service time).
+
+- Totalitarian and Rawlsian Scores: Using the individual wait times and the user satisfaction score table, we compute the Totalitarian (Tr) and Rawlsian (Mr) equity scores for each configuration under each scenario.
+
+4. The Replication Wrapper
+
+To smooth out random variation and ensure statistical confidence, this entire three-part pipeline is wrapped in a loop that runs 500 independent replications for each simulation setup. This allows us to compute highly reliable expected averages and $95\%$ confidence intervals.
+
+
+### 2.3.2 Configuration Differences and Design Loops
+
+While our four stress-test scenarios differ purely in the *inputs* generated by the DGP (adjusting parameters for arrival times and gender mixes), the three restroom layouts differ fundamentally in their *routing logic*. This structural variation is programmed directly into the simulation's queue-routing loop, reflecting the physical differences between the layouts:
+
+#### Configuration 1: Status Quo (Segregated Parallel Loops)
+
+The system is modeled as three strictly segregated parallel lines. The simulation routing loop prevents any crossover between demographic groups:
+
+- Female patrons queue exclusively for the 20 female stalls.
+
+- Male patrons queue based on their class: Class 1 males use the 10 urinals, while Class 2 males queue for the 10 male stalls.
+
+[xxx-placeholder for visual flowchart of the configuration 1 routing logic-xxx]
+[xxx-placeholder for visual flowchart of the configuration 1 simulation-xxx]
+
+#### Configuration 2: All Unisex (Fully Integrated Shared Loop)
+
+This layout removes all boundaries to maximize resource pooling. The simulation loop routes all arriving patrons into a single virtual line:
+
+- All 40 units are treated as a single, universal pool of servers. Any free stall is immediately occupied by the next patron in the unified queue, regardless of gender.
+
+[xxx-placeholder for visual flowchart of the configuration 2 routing logic-xxx]
+[xxx-placeholder for visual flowchart of the configuration 2 simulation-xxx]
+
+#### Configuration 3: The Hybrid Model (Compromise Overlapping Loop)
+
+The Hybrid Model represents the most complex design loop, splitting the restroom into dedicated and shared capacity.
+
+- Traditional queues remain for the 15 female stalls and the male facilities (10 urinals and 5 male stalls).
+
+- A separate queue feeds into the 10 unisex stalls.
+
+- The routing loop evaluates incoming patrons dynamically: segregated patrons join their respective dedicated gender queues, while unisex-preferring and no-preference patrons route to the shortest compatible queue.
+
+
+[xxx-placeholder for visual flowchart of the configuration 3 routing logic-xxx]
+[xxx-placeholder for visual flowchart of the configuration 3 simulation-xxx]
+
+### 2.3.3 Combining the DGP and Routing Logic: The Execution Matrix
+
+We program the 4 DGP Arrival Profiles (Scenarios) as standardized input datasets and the 3 Configuration Routing (RL) as independent functions. This allows a single controller function to systematically cross-evaluate the inputs against the logic in a clean, automated pipeline.
+
+[xxx-placeholder for visual flowchart of DGP and RL interaction-xxx]
+
+This modular architecture maps directly to the execution matrix below, showing how the decoupled inputs and routing logic combine programmatically:
+
+| DGP Function | RL 1: `status_quo_loop()` | RL 2: `all_unisex_loop()` | RL 3: `hybrid_loop()` |
+|---|---|---|---|
+| **DGP 1:** `dgp_female_dominated_early()` | Run 1 | Run 2 | Run 3 |
+| **DGP 2:** `dgp_female_dominated_late()` | Run 4 | Run 5 | Run 6 |
+| **DGP 3:** `dgp_male_dominated_early()` | Run 7 | Run 8 | Run 9 |
+| **DGP 4:** `dgp_male_dominated_late()` | Run 10 | Run 11 | Run 12 |
+
+: Execution matrix: 4 DGP scenarios × 3 routing configurations = 12 simulation runs, each repeated across 500 replications.
+
+## 2.4 Social Welfare Framework (The Fairness Metrics)
+
+To evaluate our configurations under an ethical and operational lens, we translate the simulated waiting times, facility assignments, and patron preferences into formal measures of stakeholder satisfaction from the established user preference satisfaction matrix (spanning scores from $0$ to $5$).
+
+### 2.4.1 The 25-Minute Threshold and Queue Failures (Supplementary Metric)
+
+While our primary objectives are maximizing overall crowd satisfaction and protecting minority demographics, we also capture a critical operational risk metric: **queue failures**.
+
+Because the intermission is a strict 25-minute window, a patron's total time in the restroom system, including both their queue waiting time and service time, should not exceed this limit. Any patron whose combined time crosses this 25-minute mark is recorded as a queue failure.
+
+Introducing this metric allows us to evaluate the real-world likelihood of patrons missing the start of the next act. This acts as a vital sanity check, ensuring we do not recommend a layout that achieves high average satisfaction scores while leaving a portion of the audience unable to return to their seats before the next act begins.
+
+### 2.4.2 Totalitarian Satisfaction: Overall Patron Welfare ($T_r$)
+
+The Totalitarian metric evaluates the global performance of the restroom by maximizing the collective satisfaction of the entire crowd. For a given restroom design option $r$, we define $s^r_{kij}$ as the discrete satisfaction score (ranging from $0$ to $5$) mapped from our satisfaction matrix based on:
+
+* **Category ($k$):** The patron's gender (Women / Men).
+* **Preferred Facility ($i$):** The patron's privacy preference (Gender-Segregated [GS], No-Preference [no-pref], or Unisex).
+* **Assigned Facility ($j$):** The restroom type they ultimately used (GS or Unisex).
+* **Wait Time:** The physical queue duration mapping to the respective lower-bound bracket ($0$, $5$, $10$, $20$, or $40$ minutes).
+
+Let $a^r_{kij}$ represent the number of patrons belonging to category $k$ with preference $i$ who ultimately use restroom type $j$ under design $r$. The **Totalitarian Satisfaction Score ($T_r$)** is calculated by summing the joint satisfaction across all active patron paths:
+
+$$T_r = \sum_{k \in K} \sum_{i \in I} \sum_{j \in J} a^r_{kij} s^r_{kij}, \quad \forall r \in R$$
+
+The analytical goal under this framework is to **maximize $T_r$**. While this score serves as our primary KPI for total system throughput and overall satisfaction, it evaluates global satisfaction without considering how that satisfaction is distributed among different groups.
+
+### 2.4.3 Rawlsian Fairness: Minimum Group Satisfaction ($M_r$)
+
+To evaluate equity and fairness, we apply a Rawlsian ethical lens. Instead of viewing the crowd as a single, uniform collective, this metric evaluates the layout's performance from the perspective of the most disadvantaged active stakeholder group.
+
+Using the same satisfaction values ($s^r_{kij}$), we identify the lowest satisfaction score experienced by any category of patrons who actually utilized the system (where the count of patrons in that pathway, represented as $d^r_{kij}$, is greater than zero). The **Rawlsian Satisfaction Score ($M_r$)** is defined as:
+
+$$M_r = \min_{k \in K, i \in I, j \in J} \{ s^r_{kij} \mid d^r_{kij} > 0 \}, \quad \forall r \in R$$
+
+The Rawlsian objective is to **maximize $M_r$**, raising the floor of the restroom experience. This mathematical constraint ensures that a restroom design is not considered successful if it achieves high overall throughput by completely sacrificing the comfort, preference, or waiting times of a smaller, vulnerable patron segment.
+
+By comparing the global satisfaction of Totalitarian Welfare ($T_r$) against the equity focus of Rawlsian Welfare ($M_r$) alongside our supplementary Queue Failure rates, we can make a highly balanced business recommendation. This dual-lens approach allows us to measure how successfully each layout balances physical operational speed with human comfort, privacy preferences, and demographic fairness. This provides management with the robust, consumer-centric evidence needed to select a restroom design that is both satisfying for the majority and equitable for all.
+
+\newpage
 
 # 3. Results
 
