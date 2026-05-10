@@ -736,6 +736,508 @@ What does it mean for management, and what should they do?
 \newpage
 
 Simulation
+burst in last 5 minutes while 80% arrive is Men
+```{r}
+#| label: setup
+#| include: false
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+set.seed(123)
+n_rep <- 500
+```
+
+```{r}
+#| label: 1.parameters
+
+# -----------------------------
+# Case parameters (from assignment data)
+# -----------------------------
+
+intermission_length <- 25       # total intermission duration (min)
+lambda_women        <- 3.2      # baseline arrival rate, women (/min)
+lambda_men          <- 3.2      # baseline arrival rate, men (/min)
+
+prob_class2         <- 0.05     # P(Class 2) — same for both genders
+pref_GS             <- 0.70     # P(GS preference)
+pref_NP             <- 0.21     # P(no preference)
+pref_UX             <- 0.09     # P(unisex preference)
+
+# Service time parameters (mean and SD per gender x class)
+service_mean_women_class1 <- 1.67;  service_sd_women_class1 <- 1.2
+service_mean_women_class2 <- 5.20;  service_sd_women_class2 <- 3.2
+service_mean_men_class1   <- 0.833; service_sd_men_class1   <- 0.7
+service_mean_men_class2   <- 5.20;  service_sd_men_class2   <- 3.2
+
+# -----------------------------
+# Scenario 3 stress-test parameters
+# -----------------------------
+
+perc_burst       <- 0.80   # 80% of arrivals in burst window
+perc_male_burst  <- 0.80   # 80% male in burst window  (scenario constraint)
+perc_male_tail   <- 0.50   # 50% male in tail window   (baseline assumption)
+# [from n-early] separate gender props for burst vs tail windows — more accurate
+# than applying one proportion to all arrivals as in s-late
+
+lambda_burst <- perc_burst * (lambda_women + lambda_men)        # 5.12 /min
+               # = 0.80 * 6.4; concentrated into last 5 min → rate = 5.12*25/5
+lambda_tail  <- (1 - perc_burst) * (lambda_women + lambda_men)  # 1.28 /min
+               # = 0.20 * 6.4; spread over first 20 min → rate = 1.28*25/20
+
+# Effective Poisson rates per phase
+# [your derivation] adjust for phase duration so expected total = 160
+rate_burst <- lambda_burst * intermission_length / 5    # = 25.6 /min in [20,25)
+rate_tail  <- lambda_tail  * intermission_length / 20   # = 1.6  /min in [0, 20)
+```
+
+
+```{r}
+#| label: 2. score-table
+# [from n-early] Long-format score table — cleaner joins than wide format in s-late
+
+score_table_long <- data.frame(
+  gender = rep(c("W", "M"), each = 6),
+  pref   = rep(c("GS","GS","NP","NP","UX","UX"), times = 2),
+  uses   = rep(c("GS","UX","GS","UX","GS","UX"), times = 2),
+  score_0  = c(5,4,5,5,3,5, 5,4,5,5,3,5),
+  score_5  = c(4,3,4,4,2,4, 4,3,4,4,2,4),
+  score_10 = c(3,2,2,2,1,3, 3,2,2,2,1,3),
+  score_20 = c(1,1,1,1,0,2, 2,0,1,1,0,2),
+  score_40 = c(0,0,0,0,0,1, 0,0,0,0,0,1)
+) |>
+  pivot_longer(
+    cols      = starts_with("score_"),
+    names_to  = "wait_band",
+    values_to = "score"
+  ) |>
+  mutate(wait_band = as.numeric(gsub("score_", "", wait_band)))
+```
+
+
+
+```{r}
+#| label: 3. module-arrival
+
+# ============================================================
+# MODULE 1: ARRIVAL GENERATION
+# Scenario 3: Late burst (last 5 min), 80% male composition
+#
+# Phase-adjusted Poisson rates preserve the
+# Poisson process with time-varying lambda — more theoretically
+# consistent with Stage 1 than runif used in s-late and n-early
+# ============================================================
+
+generate_arrivals <- function() {
+
+  # --- Tail phase: [0, 20) at low rate ---
+  tail_times <- c()
+  t <- 0
+  repeat {
+    t <- t + rexp(1, rate = rate_tail)
+    if (t >= 20) break
+    tail_times <- c(tail_times, t)
+  }
+
+  # --- Burst phase: [20, 25) at high rate ---
+  burst_times <- c()
+  t <- 20
+  repeat {
+    t <- t + rexp(1, rate = rate_burst)
+    if (t >= 25) break
+    burst_times <- c(burst_times, t)
+  }
+
+  # Combine — tail first, burst after (already chronological)
+  arrival_times <- c(tail_times, burst_times)
+  n_tail        <- length(tail_times)
+  n_burst       <- length(burst_times)
+  n_total       <- n_tail + n_burst
+
+  # --- Gender assignment ---
+  # [from n-early] separate gender composition per phase
+  gender_tail  <- sample(c("M","W"), n_tail,  replace = TRUE,
+                         prob = c(perc_male_tail,  1 - perc_male_tail))
+  gender_burst <- sample(c("M","W"), n_burst, replace = TRUE,
+                         prob = c(perc_male_burst, 1 - perc_male_burst))
+  gender <- c(gender_tail, gender_burst)
+
+  # --- Class and preference assignment ---
+  class <- sample(c(1, 2), n_total, replace = TRUE,
+                  prob = c(1 - prob_class2, prob_class2))
+
+  pref  <- sample(c("GS","NP","UX"), n_total, replace = TRUE,
+                  prob = c(pref_GS, pref_NP, pref_UX))
+
+  data.frame(
+    patron_id    = seq_len(n_total),
+    arrival_time = arrival_times,
+    gender       = gender,
+    class        = class,
+    pref         = pref
+  )
+}
+```
+
+
+
+```{r}
+#| label: 4.service-time-generator
+
+# ============================================================
+# MODULE 2: SERVICE TIME GENERATOR
+#
+# [from b-early] Gamma distribution — physically motivated
+# (service = sum of small exponential sub-tasks), always positive,
+# exactly matches target mean and SD without truncation distortion.
+#
+# Shape and scale back-calculated from case mean and SD:
+#   shape = (mean/sd)^2
+#   scale = sd^2 / mean
+# ============================================================
+
+r_service_gamma <- function(n, mean_service, sd_service) {
+  shape <- (mean_service / sd_service)^2
+  scale <- sd_service^2 / mean_service
+  rgamma(n, shape = shape, scale = scale)
+}
+
+draw_service_time <- function(gender, class) {
+  # Vectorised: draws one service time per patron based on gender x class
+  mapply(function(g, cl) {
+    if      (g == "W" & cl == 1) r_service_gamma(1, service_mean_women_class1, service_sd_women_class1)
+    else if (g == "W" & cl == 2) r_service_gamma(1, service_mean_women_class2, service_sd_women_class2)
+    else if (g == "M" & cl == 1) r_service_gamma(1, service_mean_men_class1,   service_sd_men_class1)
+    else                          r_service_gamma(1, service_mean_men_class2,   service_sd_men_class2)
+  }, gender, class)
+}
+```
+
+
+```{r}
+#| label: 5.module-routing
+
+# ============================================================
+# MODULE 3: FACILITY ASSIGNMENT
+# Routes each patron to a facility based on config and preference.
+# np_to_gs: proportion of no-preference patrons routed to GS (default 0.5)
+#
+# [from s-late] get_capacity() centralises server counts — one place to change
+# [from s-late] assign_facility() concise vectorised logic
+# ============================================================
+
+get_capacity <- function(config) {
+  switch(config,
+    "Status Quo" = list(women_stall = 20, men_urinal = 10, men_stall = 10, unisex = 0),
+    "All Unisex" = list(women_stall = 0,  men_urinal = 0,  men_stall = 0,  unisex = 40),
+    "Hybrid"     = list(women_stall = 15, men_urinal = 10, men_stall = 5,  unisex = 10),
+    stop("Unknown configuration")
+  )
+}
+
+assign_facility <- function(users, config, np_to_gs = 0.5) {
+
+  users$facility <- NA_character_
+
+  if (config == "Status Quo") {
+    # All users go to gender-segregated only — no routing decision needed
+    users$facility[users$gender == "W"]                              <- "women_stall"
+    users$facility[users$gender == "M" & users$class == 1]          <- "men_urinal"
+    users$facility[users$gender == "M" & users$class == 2]          <- "men_stall"
+  }
+
+  if (config == "All Unisex") {
+    # Everyone goes to one pooled queue
+    users$facility <- "unisex"
+  }
+
+  if (config == "Hybrid") {
+    # GS-preference → gender-segregated
+    users$facility[users$pref == "GS" & users$gender == "W"]                     <- "women_stall"
+    users$facility[users$pref == "GS" & users$gender == "M" & users$class == 1]  <- "men_urinal"
+    users$facility[users$pref == "GS" & users$gender == "M" & users$class == 2]  <- "men_stall"
+
+    # UX-preference → unisex
+    users$facility[users$pref == "UX"] <- "unisex"
+
+    # No-preference → 50/50 split
+    # [from s-late] vectorised runif draw — concise
+    is_np    <- users$pref == "NP"
+    go_to_gs <- runif(nrow(users)) < np_to_gs
+
+    users$facility[is_np &  go_to_gs & users$gender == "W"]                    <- "women_stall"
+    users$facility[is_np &  go_to_gs & users$gender == "M" & users$class == 1] <- "men_urinal"
+    users$facility[is_np &  go_to_gs & users$gender == "M" & users$class == 2] <- "men_stall"
+    users$facility[is_np & !go_to_gs]                                           <- "unisex"
+  }
+
+  users
+}
+```
+
+
+```{r}
+#| label: 6.module-simulation-loop
+
+# ============================================================
+# MODULE 4: DISCRETE EVENT SIMULATION LOOP
+# k-server queue using the lecturer's 2-inspector logic,
+# generalised to k servers via which.min(server_available).
+#
+# Input:  data frame with arrival_time and service_time columns
+# Output: same data frame with start_time, completion_time,
+#         waiting_time, system_time appended
+# ============================================================
+
+simulate_queue <- function(queue_data, k) {
+
+  queue_data      <- queue_data |> arrange(arrival_time)
+  n               <- nrow(queue_data)
+  server_available <- rep(0, k)   # tracks when each server next becomes free
+  start_time      <- numeric(n)
+  completion_time <- numeric(n)
+
+  for (i in seq_len(n)) {
+    # Find earliest-free server — generalises lecturer's which.min(c(QI1, QI2))
+    next_server      <- which.min(server_available)
+    start_time[i]    <- max(queue_data$arrival_time[i], server_available[next_server])
+    completion_time[i] <- start_time[i] + queue_data$service_time[i]
+    server_available[next_server] <- completion_time[i]
+    # History not stored — only current availability matters (memory efficient)
+  }
+
+  queue_data |>
+    mutate(
+      start_time      = start_time,
+      completion_time = completion_time,
+      waiting_time    = start_time - arrival_time,
+      system_time     = completion_time - arrival_time
+    )
+}
+
+simulate_config <- function(users, config, np_to_gs = 0.5) {
+
+  users_routed <- assign_facility(users, config, np_to_gs)
+  cap          <- get_capacity(config)
+
+  # [from s-late] map_dfr over facilities — cleaner than for loop + rbind
+  names(cap) |>
+    purrr::map_dfr(function(fac) {
+      fac_data <- users_routed |> filter(facility == fac)
+      if (nrow(fac_data) == 0 || cap[[fac]] == 0) return(NULL)
+      simulate_queue(fac_data, k = cap[[fac]])
+    }) |>
+    mutate(configuration = config)
+}
+```
+
+
+```{r}
+#| label: 7.module-scoring
+
+# ============================================================
+# MODULE 5: EQUITY SCORING
+# Attaches preference score to each patron based on:
+#   wait time bracket x gender x preference x facility used
+#
+# [from n-early] long-format score table with left_join —
+# cleaner and less error-prone than get_score() row lookup in s-late
+# ============================================================
+
+get_wait_band <- function(wait_time) {
+  # Map continuous wait time to discrete score table bracket
+  case_when(
+    wait_time >= 40 ~ 40,
+    wait_time >= 20 ~ 20,
+    wait_time >= 10 ~ 10,
+    wait_time >= 5  ~ 5,
+    TRUE            ~ 0
+  )
+}
+
+add_equity_scores <- function(results) {
+  results |>
+    mutate(
+      uses      = ifelse(facility == "unisex", "UX", "GS"),
+      wait_band = get_wait_band(waiting_time)
+    ) |>
+    left_join(score_table_long,
+              by = c("gender", "pref", "uses", "wait_band"))
+}
+```
+
+
+```{r}
+#| label: 8.module-summary
+
+# ============================================================
+# MODULE 6: REPLICATION SUMMARY
+# Computes per-replication metrics for one scenario x config.
+# Rawlsian: min of group-level mean scores (gender x preference)
+# — more granular than min of individual scores
+#
+# [from n-early] gender_wait_gap and worst_group identification
+# stored explicitly — useful for Direction A fairness narrative
+# [from s-late] clean separation into its own function
+# ============================================================
+
+summarise_one_rep <- function(results) {
+
+  scored <- add_equity_scores(results)
+
+  # --- Operational metrics ---
+  ops <- scored |>
+    group_by(configuration) |>
+    summarise(
+      mean_wait          = mean(waiting_time),
+      p90_wait           = as.numeric(quantile(waiting_time, 0.90)),
+      pct_completed_25   = mean(completion_time <= intermission_length) * 100,
+      n_unserved_25      = sum(completion_time > intermission_length),
+      .groups = "drop"
+    )
+
+  # --- Gender wait gap (Direction A key metric) ---
+  gender_gap <- scored |>
+    group_by(configuration, gender) |>
+    summarise(mean_wait_g = mean(waiting_time), .groups = "drop") |>
+    pivot_wider(names_from = gender, values_from = mean_wait_g) |>
+    mutate(gender_wait_gap = W - M) |>          # positive = women wait longer
+    select(configuration, gender_wait_gap)
+
+  # --- Totalitarian score ---
+  totalitarian <- scored |>
+    group_by(configuration) |>
+    summarise(totalitarian_score = mean(score, na.rm = TRUE), .groups = "drop")
+
+  # --- Rawlsian score: min of group-level means (gender x preference) ---
+  # [from n-early] group-level mean before taking min — more stable than
+  # individual-level min used in Stage 1 analytical code
+  rawlsian <- scored |>
+    group_by(configuration, gender, pref) |>
+    summarise(group_score = mean(score, na.rm = TRUE), .groups = "drop") |>
+    group_by(configuration) |>
+    summarise(
+      rawlsian_score     = min(group_score),
+      worst_group_gender = gender[which.min(group_score)],
+      worst_group_pref   = pref[which.min(group_score)],
+      .groups = "drop"
+    )
+
+  # Join all metrics into one row per configuration
+  ops |>
+    left_join(gender_gap,   by = "configuration") |>
+    left_join(totalitarian, by = "configuration") |>
+    left_join(rawlsian,     by = "configuration")
+}
+```
+
+
+```{r}
+#| label: 9.run-simulation
+
+# ============================================================
+# RUN: 500 replications x 3 configurations
+# [from s-late] map_dfr over reps — cleaner than list + bind_rows
+# ============================================================
+
+configs <- c("Status Quo", "All Unisex", "Hybrid")
+
+rep_results <- purrr::map_dfr(seq_len(n_rep), function(r) {
+
+  # Generate one intermission's worth of arrivals
+  users <- generate_arrivals()
+
+  # Draw service times for each patron
+  users$service_time <- draw_service_time(users$gender, users$class)
+
+  # Run all 3 configurations on the same patron set
+  all_configs <- purrr::map_dfr(configs, ~ simulate_config(users, .x))
+
+  # Summarise metrics for this replication
+  summarise_one_rep(all_configs) |>
+    mutate(replication = r)
+})
+```
+
+
+```{r}
+#| label: 10.results-summary
+
+# ============================================================
+# SUMMARY: Average across 500 replications
+# ============================================================
+
+summary_table <- rep_results |>
+  group_by(configuration) |>
+  summarise(
+    mean_wait          = mean(mean_wait),
+    p90_wait           = mean(p90_wait),
+    pct_completed_25   = mean(pct_completed_25),
+    n_unserved_25      = mean(n_unserved_25),
+    gender_wait_gap    = mean(gender_wait_gap, na.rm = TRUE),
+    totalitarian_score = mean(totalitarian_score),
+    rawlsian_score     = mean(rawlsian_score),
+    .groups = "drop"
+  ) |>
+  mutate(
+    totalitarian_rank = rank(-totalitarian_score, ties.method = "min"),
+    rawlsian_rank     = rank(-rawlsian_score,     ties.method = "min")
+  )
+
+print(summary_table, width = Inf)
+```
+
+```{r}
+#| label: plot-wait
+
+# Mean waiting time with 95% CI error bars
+# [from n-early] error bars using 1.96 * SE across reps
+
+plot_wait <- rep_results |>
+  group_by(configuration) |>
+  summarise(
+    mean = mean(mean_wait),
+    se   = sd(mean_wait) / sqrt(n()),
+    .groups = "drop"
+  ) |>
+  mutate(lower = mean - 1.96 * se, upper = mean + 1.96 * se)
+
+ggplot(plot_wait, aes(x = configuration, y = mean, fill = configuration)) +
+  geom_col(show.legend = FALSE) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  labs(
+    title    = "Scenario 3: Mean Waiting Time by Configuration",
+    subtitle = "Late burst (last 5 min), 80% male — 500 replications",
+    x = "", y = "Mean Wait (min)"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: plot-fairness
+
+# Totalitarian vs Rawlsian trade-off
+# [from b-early] scatter plot — good for Direction A narrative
+
+ggplot(summary_table, aes(x = totalitarian_score, y = rawlsian_score,
+                          colour = configuration, label = configuration)) +
+  geom_point(size = 5) +
+  ggrepel::geom_text_repel() +
+  labs(
+    title = "Equity Trade-off: Totalitarian vs Rawlsian",
+    subtitle = "Scenario 3: Late burst, 80% male",
+    x = "Totalitarian Score (Tr)", y = "Rawlsian Score (Mr)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+
+\newpage
+
+Simulation
 burst in early 5 minutes while 80% arrive is Men
 
 ```{r}
