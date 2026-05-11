@@ -1528,14 +1528,11 @@ score_table <- data.frame(
 # Basic helper functions
 # ============================================================
 
-rnorm_positive <- function(n, mean, sd) {
-  x <- rnorm(n, mean = mean, sd = sd)
+r_service_gamma <- function(n, mean_service, sd_service) {
+  shape <- (mean_service / sd_service)^2
+  scale <- sd_service^2 / mean_service
   
-  while (any(x <= 0)) {
-    x[x <= 0] <- rnorm(sum(x <= 0), mean = mean, sd = sd)
-  }
-  
-  return(x)
+  rgamma(n, shape = shape, scale = scale)
 }
 
 
@@ -1855,7 +1852,7 @@ generate_stage2_users <- function(rep_id, scenario, arrival_pattern, prob_class2
   for (i in 1:n_users) {
     
     if (gender[i] == "W" & service_class[i] == "class1") {
-      service_time[i] <- rnorm_positive(
+      service_time[i] <- r_service_gamma(
         1,
         service_mean_women_class1,
         service_sd_women_class1
@@ -1863,7 +1860,7 @@ generate_stage2_users <- function(rep_id, scenario, arrival_pattern, prob_class2
     }
     
     if (gender[i] == "W" & service_class[i] == "class2") {
-      service_time[i] <- rnorm_positive(
+      service_time[i] <- r_service_gamma(
         1,
         service_mean_women_class2,
         service_sd_women_class2
@@ -1871,7 +1868,7 @@ generate_stage2_users <- function(rep_id, scenario, arrival_pattern, prob_class2
     }
     
     if (gender[i] == "M" & service_class[i] == "class1") {
-      service_time[i] <- rnorm_positive(
+      service_time[i] <- r_service_gamma(
         1,
         service_mean_men_class1,
         service_sd_men_class1
@@ -1879,7 +1876,7 @@ generate_stage2_users <- function(rep_id, scenario, arrival_pattern, prob_class2
     }
     
     if (gender[i] == "M" & service_class[i] == "class2") {
-      service_time[i] <- rnorm_positive(
+      service_time[i] <- r_service_gamma(
         1,
         service_mean_men_class2,
         service_sd_men_class2
