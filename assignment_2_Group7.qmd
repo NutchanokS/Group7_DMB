@@ -4,8 +4,8 @@ subtitle: "ETF3480 - ETF5480 Assignment 2"
 author:
   - "Tzu-Hsuan Yang (35461586)"
   - "Nutchanok Saitin (35493011)"
-  - "Mohammad Zulkifli Falaqi"
-  - "Bagas Wibawanto"
+  - "Mohammad Zulkifli Falaqi ()"
+  - "Bagas Wibawanto ()"
 toc: true
 format:
   pdf:
@@ -576,6 +576,9 @@ This analysis operates under specific constraints that need further study:
 - Behavioral Split Assumptions: We assumed a 50/50 split for "No Preference" users. Future work (under Direction B) should use sensitivity analysis to see if a 70/30 split (due to habit or social conditioning) would lead to queue imbalances in the universal stalls.
 
 - Accessibility (Inclusive Design): Acknowledge that "Equity" isn't just about wait time; it's about the physical features of the stall (grab bars, space for strollers). Future work could weight the Equity Scores by a "Necessity Index."
+
+
+
 
 **NOT FINALISED**
 
@@ -2134,21 +2137,23 @@ burst in first 5 minutes while 80% arrive is women
 ```{r}
 # ============================================================
 # Stage 2 Simulation:
-# Early Female-Dominant Burst Stress Test
+# Scenario 1: Female-Dominated Early Rush Stress Test
 # ============================================================
 
 library(dplyr)
 library(tidyr)
+library(knitr)
+library(kableExtra)
 library(ggplot2)
 
-set.seed(123)
+set.seed(35493011)
 
 # ============================================================
 # 1. Main simulation settings
 # ============================================================
 
-n_rep <- 500
-intermission_length <- 25
+n_rep <- 500 # Repeat 500 times for stable mean
+intermission_length <- 25 
 
 # Arrival rate from case:
 # Women = 3.2 per minute, Men = 3.2 per minute
@@ -2157,11 +2162,11 @@ expected_users <- total_arrival_rate * intermission_length
 
 configs <- c("Status Quo", "All Unisex", "Hybrid Model")
 
-# Stage 2 scenario:
+# Stage 2 Scenario 1:
+# 80% female / 20% male audience.
 # 80% of restroom users arrive in the first 5 minutes.
-# Among this burst group, 80% are women.
 stage2_scenarios <- data.frame(
-  scenario = c("Early female-dominant burst"),
+  scenario = c("Scenario 1: Female-dominant early rush"),
   burst_timing = c("early"),
   burst_prop = c(0.80),
   burst_female_prop = c(0.80),
@@ -2171,25 +2176,27 @@ stage2_scenarios <- data.frame(
 )
 
 stage2_scenarios
+```
 
-stage2_scenarios$scenario <- factor(
-  stage2_scenarios$scenario,
-  levels = stage2_scenarios$scenario
-)
 
+```{r}
 # ============================================================
-# 2. Service-time generator
+# 2. Gamma service-time generator
 # ============================================================
-# Lognormal service time is used because service time cannot be negative.
+# Gamma service time is used because restroom service time must be positive
+# and can be right-skewed. The shape and scale are calculated so that
+# the generated service time matches the mean and standard deviation.
 
-r_service_lognormal <- function(n, mean_service, sd_service) {
-  sigma2 <- log(1 + (sd_service^2 / mean_service^2))
-  sigma <- sqrt(sigma2)
-  mu <- log(mean_service) - sigma2 / 2
+r_service_gamma <- function(n, mean_service, sd_service) {
+  shape <- (mean_service / sd_service)^2
+  scale <- (sd_service^2) / mean_service
   
-  rlnorm(n, meanlog = mu, sdlog = sigma)
+  rgamma(n, shape = shape, scale = scale)
 }
+```
 
+
+```{r}
 # ============================================================
 # 3. Generate users for one intermission
 # ============================================================
@@ -2225,26 +2232,16 @@ generate_users <- function(
       max = intermission_length
     )
     
-  } else if (burst_timing == "late") {
+  } else {
     
-    # remaining 20% arrive between minute 0 and 20
-    non_burst_arrivals <- runif(
-      n_non_burst,
-      min = 0,
-      max = intermission_length - 5
-    )
-    
-    # 80% arrive in last 5 minutes
-    burst_arrivals <- runif(
-      n_burst,
-      min = intermission_length - 5,
-      max = intermission_length
-    )
+    stop("This Stage 2 scenario only supports early burst timing.")
   }
   
   # -----------------------------
   # Gender mix
   # -----------------------------
+  # The whole audience is female-dominated:
+  # 80% women in both burst and non-burst groups.
   
   burst_gender <- sample(
     c("Women", "Men"),
@@ -2311,9 +2308,9 @@ generate_users <- function(
       service_sd = service_sd * service_sd_multiplier
     )
   
-  # Generate random service time
+  # Generate Gamma-distributed service time
   users$service_time <- mapply(
-    r_service_lognormal,
+    r_service_gamma,
     n = 1,
     mean_service = users$service_mean,
     sd_service = users$service_sd
@@ -2326,7 +2323,10 @@ generate_users <- function(
   
   users
 }
+```
 
+
+```{r}
 # ============================================================
 # 4. Multi-server queue simulator
 # ============================================================
@@ -2361,7 +2361,10 @@ simulate_queue_k <- function(arrival_time, service_time, k) {
     system_time = system_time
   )
 }
+```
 
+
+```{r}
 # ============================================================
 # 5. Assign users to facilities
 # ============================================================
@@ -2426,7 +2429,7 @@ assign_facility <- function(users, config_name, np_unisex_prob = 0.50) {
         users$class_type == "Class 2"
     ] <- "Men_stalls"
     
-    # No-preference users split between gendered and unisex
+    # No-preference users split 50/50 between gendered and unisex
     np_index <- which(users$preference == "NP")
     go_unisex <- runif(length(np_index)) < np_unisex_prob
     
@@ -2455,7 +2458,9 @@ assign_facility <- function(users, config_name, np_unisex_prob = 0.50) {
   
   users
 }
+```
 
+```{r}
 # ============================================================
 # 6. Simulate one configuration
 # ============================================================
@@ -2520,7 +2525,9 @@ simulate_config <- function(users, config_name, np_unisex_prob = 0.50) {
   
   output
 }
+```
 
+```{r}
 # ============================================================
 # 7. Preference / equity score table
 # ============================================================
@@ -2592,7 +2599,10 @@ add_equity_scores <- function(sim_data) {
       by = c("gender", "preference", "restroom_type", "wait_band")
     )
 }
+```
 
+
+```{r}
 # ============================================================
 # 8. Run repeated Stage 2 simulation
 # ============================================================
@@ -2622,7 +2632,7 @@ for (s in 1:nrow(stage2_scenarios)) {
       non_burst_female_prop = non_burst_female_prop_s,
       service_sd_multiplier = sd_multiplier_s,
       class2_prob = class2_prob_s
-      )
+    )
     
     for (cfg in configs) {
       
@@ -2676,16 +2686,19 @@ for (s in 1:nrow(stage2_scenarios)) {
           scenario = scenario_name,
           replication = r,
           config = cfg,
-
-           burst_timing = burst_timing_s,
-           burst_prop = burst_prop_s,
-           burst_female_prop = burst_female_prop_s,
+          
+          burst_timing = burst_timing_s,
+          burst_prop = burst_prop_s,
+          burst_female_prop = burst_female_prop_s,
+          non_burst_female_prop = non_burst_female_prop_s,
           
           mean_wait = mean(waiting_time),
           median_wait = median(waiting_time),
           p90_wait = as.numeric(quantile(waiting_time, 0.90)),
           max_wait = max(waiting_time),
+          
           pct_completed_25 = mean(completion_time <= intermission_length) * 100,
+          queue_failure_rate = mean(completion_time > intermission_length) * 100,
           n_unserved_25 = sum(completion_time > intermission_length),
           
           gender_wait_gap = gender_wait_gap,
@@ -2752,6 +2765,9 @@ group_equity_results$config <- factor(
   group_equity_results$config,
   levels = c("Status Quo", "All Unisex", "Hybrid Model")
 )
+```
+
+```{r}
 
 # ============================================================
 # 9. Summary tables
@@ -2765,6 +2781,7 @@ summary_stage2 <- config_results %>%
     p90_wait = mean(p90_wait),
     avg_max_wait = mean(max_wait),
     pct_completed_25 = mean(pct_completed_25),
+    queue_failure_rate = mean(queue_failure_rate),
     avg_n_unserved_25 = mean(n_unserved_25),
     gender_wait_gap = mean(gender_wait_gap),
     totalitarian_score = mean(totalitarian_score),
@@ -2800,7 +2817,10 @@ summary_group_equity_stage2 <- group_equity_results %>%
   arrange(scenario, config, mean_equity_score)
 
 print(summary_group_equity_stage2, width = Inf)
+```
 
+
+```{r}
 # ============================================================
 # 10. Decision table
 # ============================================================
@@ -2809,6 +2829,7 @@ decision_stage2 <- summary_stage2 %>%
   group_by(scenario) %>%
   mutate(
     operational_rank = rank(mean_wait, ties.method = "min"),
+    queue_failure_rank = rank(queue_failure_rate, ties.method = "min"),
     totalitarian_rank = rank(-totalitarian_score, ties.method = "min"),
     rawlsian_rank = rank(-rawlsian_group_score, ties.method = "min")
   ) %>%
@@ -2819,19 +2840,24 @@ decision_stage2 <- summary_stage2 %>%
     mean_wait,
     p90_wait,
     pct_completed_25,
+    queue_failure_rate,
     gender_wait_gap,
     totalitarian_score,
     rawlsian_group_score,
     operational_rank,
+    queue_failure_rank,
     totalitarian_rank,
     rawlsian_rank
   ) %>%
   arrange(scenario, operational_rank)
 
 print(decision_stage2, width = Inf)
+```
 
+
+```{r}
 # ============================================================
-# 11. Plot: Mean waiting time by scenario
+# 11. Plot: Mean waiting time
 # ============================================================
 
 plot_wait_scenario <- config_results %>%
@@ -2847,16 +2873,43 @@ plot_wait_scenario <- config_results %>%
 ggplot(plot_wait_scenario, aes(x = config, y = mean)) +
   geom_col() +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  facet_wrap(~ scenario) +
   labs(
-    title = "Mean Waiting Time Across Stage 2 Stress Tests",
+    title = "Mean Waiting Time Under Scenario 1",
     x = "Configuration",
     y = "Mean Waiting Time (minutes)"
   )
+```
 
 
+```{r}
 # ============================================================
-# 12. Plot: Percentage completed within 25 minutes
+# 12. Plot: Queue failure rate
+# ============================================================
+
+plot_failure <- config_results %>%
+  group_by(scenario, config) %>%
+  summarise(
+    mean = mean(queue_failure_rate),
+    se = sd(queue_failure_rate) / sqrt(n()),
+    lower = mean - 1.96 * se,
+    upper = mean + 1.96 * se,
+    .groups = "drop"
+  )
+
+ggplot(plot_failure, aes(x = config, y = mean)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  labs(
+    title = "Queue Failure Rate Under Scenario 1",
+    x = "Configuration",
+    y = "Queue Failure Rate (%)"
+  )
+```
+
+
+```{r}
+# ============================================================
+# 13. Plot: Percentage completed within 25 minutes
 # ============================================================
 
 plot_completion <- config_results %>%
@@ -2872,13 +2925,18 @@ plot_completion <- config_results %>%
 ggplot(plot_completion, aes(x = config, y = mean)) +
   geom_col() +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  facet_wrap(~ scenario) +
   labs(
-    title = "Percentage Completed Within 25 Minutes Across Stage 2 Stress Tests",
+    title = "Percentage Completed Within 25 Minutes Under Scenario 1",
     x = "Configuration",
     y = "Completed Within Intermission (%)"
   )
+```
 
+
+```{r}
+# ============================================================
+# 14. Plot: Mean waiting time by gender
+# ============================================================
 
 plot_gender_wait <- gender_results %>%
   group_by(scenario, config, gender) %>%
@@ -2890,10 +2948,6 @@ plot_gender_wait <- gender_results %>%
     .groups = "drop"
   )
 
-# ============================================================
-# 13. Plot: Mean waiting time by gender
-# ============================================================
-
 ggplot(plot_gender_wait, aes(x = config, y = mean, fill = gender)) +
   geom_col(position = position_dodge(width = 0.8)) +
   geom_errorbar(
@@ -2901,17 +2955,18 @@ ggplot(plot_gender_wait, aes(x = config, y = mean, fill = gender)) +
     position = position_dodge(width = 0.8),
     width = 0.2
   ) +
-  facet_wrap(~ scenario) +
   labs(
-    title = "Mean Waiting Time by Gender Across Stage 2 Stress Tests",
+    title = "Mean Waiting Time by Gender Under Scenario 1",
     x = "Configuration",
     y = "Mean Waiting Time (minutes)",
     fill = "Gender"
   )
+```
 
 
+```{r}
 # ============================================================
-# 14. Plot: Gender waiting-time gap by scenario
+# 15. Plot: Gender waiting-time gap
 # ============================================================
 
 plot_gender_gap <- config_results %>%
@@ -2927,16 +2982,17 @@ plot_gender_gap <- config_results %>%
 ggplot(plot_gender_gap, aes(x = config, y = mean)) +
   geom_col() +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  facet_wrap(~ scenario) +
   labs(
-    title = "Gender Waiting-Time Gap Across Stage 2 Stress Tests",
+    title = "Gender Waiting-Time Gap Under Scenario 1",
     x = "Configuration",
     y = "Women Mean Wait - Men Mean Wait (minutes)"
   )
+```
 
 
+```{r}
 # ============================================================
-# 15. Plot: Totalitarian equity score by scenario
+# 16. Plot: Totalitarian equity score
 # ============================================================
 
 plot_totalitarian <- config_results %>%
@@ -2952,16 +3008,17 @@ plot_totalitarian <- config_results %>%
 ggplot(plot_totalitarian, aes(x = config, y = mean)) +
   geom_col() +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  facet_wrap(~ scenario) +
   labs(
-    title = "Totalitarian Equity Score Across Stage 2 Stress Tests",
+    title = "Totalitarian Equity Score Under Scenario 1",
     x = "Configuration",
     y = "Average Equity Score"
   )
+```
 
 
+```{r}
 # ============================================================
-# 16. Plot: Rawlsian equity score by scenario
+# 17. Plot: Rawlsian equity score
 # ============================================================
 
 plot_rawlsian <- config_results %>%
@@ -2977,9 +3034,8 @@ plot_rawlsian <- config_results %>%
 ggplot(plot_rawlsian, aes(x = config, y = mean)) +
   geom_col() +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  facet_wrap(~ scenario) +
   labs(
-    title = "Rawlsian Equity Score Across Stage 2 Stress Tests",
+    title = "Rawlsian Equity Score Under Scenario 1",
     x = "Configuration",
     y = "Lowest Group Average Equity Score"
   )
