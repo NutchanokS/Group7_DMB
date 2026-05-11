@@ -561,6 +561,21 @@ Apply a fairness feasibility threshold: a configuration is considered unacceptab
 # 4. Discussions of results and business recommendation
 
 # 5. Conclusion and further suggested work
+## 5.1 Final Conclusion
+Our investigation concludes that Configuration 3 (Hybrid Model) is the superior choice for the concert hall. It successfully navigates the "Intermission Challenge" by maintaining the high-efficiency throughput of Men’s urinals while providing the flexible, inclusive capacity of 10 universal stalls. This configuration is unique in that it represents a Pareto improvement over the Status Quo, it is simultaneously more efficient (Totalitarian) and more just (Rawlsian). Implementation will resolve long-standing customer complaints regarding both wait times and a lack of inclusive design. The consistent performance of the Hybrid Model across all four stress-test scenarios (Early/Late Bursts and Male/Female Dominance) provides management with a robust, data-driven mandate for restroom redesign.
+
+In the other hand, The simulation results reveal that the Status Quo (Config 1) is operationally fragile. Under "Early Burst" conditions, the system fails to absorb the rush, leading to extreme stakeholder disparity. Conversely, while the All Unisex model (Config 2) promotes total inclusivity, it often suffers from "efficiency leakage" where high service-time variance from Class 2 patrons spills over into the general population, lowering the satisfaction of standard users.
+
+## 5.2 Limitations and Future Work
+This analysis operates under specific constraints that need further study:
+
+- Cost Analysis: Excellent business addition. While the Hybrid Model wins on utility, it requires physical renovation (moving walls, changing signs). Management needs a Net Present Value (NPV) or ROI analysis comparing the cost of renovation against the "cost of customer dissatisfaction."
+
+- Different Event Types: A "K-Pop" concert might be 90% female, while a "Heavy Metal Concerts" might be 90% male. Improvement: Suggest a Sensitivity Analysis on the perc_male variable to find the "breaking point" for each configuration.
+
+- Behavioral Split Assumptions: We assumed a 50/50 split for "No Preference" users. Future work (under Direction B) should use sensitivity analysis to see if a 70/30 split (due to habit or social conditioning) would lead to queue imbalances in the universal stalls.
+
+- Accessibility (Inclusive Design): Acknowledge that "Equity" isn't just about wait time; it's about the physical features of the stall (grab bars, space for strollers). Future work could weight the Equity Scores by a "Necessity Index."
 
 **NOT FINALISED**
 
