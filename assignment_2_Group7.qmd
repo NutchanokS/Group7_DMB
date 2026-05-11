@@ -461,6 +461,10 @@ Before presenting results, this section summarises the input parameters and mode
 | Totalitarian (Tr) | 4.82  |
 |   Rawlsian (Mr)   |   3   |
 
+All three lines operate at low utilisation (ρ ranging from 8.3% to 29.5%), with near-instantaneous wait times across the board, confirming that the existing 40-unit segregated layout has more than sufficient capacity under steady-state demand. 
+
+However, the system entirely excludes unisex-preference patrons, who have no designated facility, which drives the Rawlsian score down to 3, the lowest among all configurations. This makes Config 1 efficient for the majority but structurally inequitable for a minority of patrons whose preferences are not accommodated at all.
+
 ### 3.2.2 Configuration 2: All Unisex
 
 **Queuing performance**
@@ -475,6 +479,10 @@ Before presenting results, this section summarises the input parameters and mode
 |:-----------------:|:-----:|
 | Totalitarian (Tr) |  4.3  |
 |   Rawlsian (Mr)   |   4   |
+
+The single pooled queue of 40 unisex stalls operates at 23.2% utilisation with a negligible mean wait of under 0.001 minutes, benefiting from the pooling effect across all patron types. 
+
+While this design is the most inclusive in terms of access, it scores lower on the Totalitarian metric (Tr = 4.30) because gender-segregated preference patrons who are majority, directed to a facility type they did not prefer. The Rawlsian score of 4 reflects an improvement over Config 1, as all patron groups now have access to at least one facility, though majority preference satisfaction is sacrificed.
 
 ### 3.2.3 Configuration 3: Hybrid Model
 
@@ -491,9 +499,13 @@ Before presenting results, this section summarises the input parameters and mode
 | Totalitarian (Tr) |   5   |
 |   Rawlsian (Mr)   |   5   |
 
+By splitting capacity into four dedicated lines (15 women's stalls, 10 men's urinals, 5 men's stalls, 10 unisex stalls), Config 3 achieves the best preference-matching across all groups, resulting in perfect Totalitarian and Rawlsian scores of 5. 
+
+All lines remain well within capacity (ρ between 13.4% and 31.7%), with wait times comparable to the other configurations. This design demonstrates that a 40-unit layout can simultaneously serve both gender-segregated and unisex-preference patrons without any efficiency trade-off under steady-state conditions.
+
 ### 3.2.4 Comparative Equity Analysis
 
-In general, all configurations perform well in terms of overall average waiting time, with all lines operating well within capacity. It is expected since this is a baseline analysis under idealised steady-state conditions, where the system is not stressed by burst arrivals or high service-time variability. The M/G/k model is applied to all configurations using the pooled WAST parameters. Results show all systems are well within capacity (ρ \< 35% across all lines), with near-zero wait times.
+All three configurations perform well under steady-state conditions, with all lines operating well within capacity (ρ < 35% across all lines) and near-zero queue wait times. This is consistent with the baseline steady-state assumption, where the system is not stressed by burst arrivals or high service-time variability. 
 
 However, the fairness scores reveal important differences in how each configuration serves different user groups. Across the three configurations, the equity scores can be summarised as follows:
 
@@ -510,7 +522,14 @@ Based on the resulted equity scores, the configurations can be ranked as follows
 
 -   Rawlsian ranking: Config 3 \> Config 2 \> Config 1
 
-While the baseline results establish a clear ranking under idealised conditions, real concert hall intermissions rarely conform to steady-state assumptions. Patrons tend to surge toward restrooms immediately after the performance pauses, or rush back just before it resumes. The following section examines whether the baseline ranking holds under these more realistic demand patterns.
+While the baseline results establish a clear ranking under idealised conditions, 
+they also confirm that all three configurations distribute the same 40-unit 
+capacity differently yet remain theoretically sufficient to serve all patrons 
+within the intermission window. However, real concert hall intermissions rarely 
+conform to steady-state assumptions, as patrons tend to surge toward restrooms 
+immediately after the performance pauses or rush back just before it resumes. 
+The following section examines whether this capacity sufficiency and equity 
+ranking hold under these more realistic demand patterns.
 
 ## 3.3 Simulation stress-test design
 
