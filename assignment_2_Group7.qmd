@@ -560,7 +560,78 @@ Apply a fairness feasibility threshold: a configuration is considered unacceptab
 
 # 4. Discussions of results and business recommendation
 
+### 4.1 Key findings from the results
+
+The Stage 2 stress-test results show a clear trade-off between operational efficiency and preference-based fairness. Under the early female-dominant burst scenario, the All Unisex configuration gives the strongest waiting-time performance. This is because all 40 restroom units are pooled into one shared system, so available capacity can be used by any user.
+
+However, when fairness is measured using Totalitarian and Rawlsian equity scores, the Hybrid Model performs better. This suggests that although All Unisex is faster, the Hybrid Model provides a stronger balance between waiting-time performance, user preference, and inclusivity.
+
+### 4.2 Business interpretation
+
+For management, the results mean that the “best” configuration depends on the decision priority. If the main objective is to reduce queueing time during intermission, the All Unisex configuration is the strongest option because it pools all 40 units and responds better to sudden demand.
+
+However, the business problem is broader than queue length. Management also needs to respond to complaints about inclusive restroom design. From this wider business perspective, the Hybrid Model is more suitable because it preserves choice. It provides gender-segregated facilities for users who prefer them, while also providing unisex facilities for users who prefer or require all-gender access.
+
+Therefore, the result should not be interpreted as “All Unisex is best overall”. Instead, All Unisex is best for queueing efficiency, while Hybrid is best when fairness, inclusivity, and user preference are included in the decision.
+
+|  Configuration  |   Main finding                   | Business meaning                    |
+|:----------------|:---------------------------------|:------------------------------------|
+|  Status Quo     |   Weakest inclusivity            |  Does not solve the core complaint  |
+|  All Unisex     |   Best waiting-time efficiency   |  Fastest queue solution             |
+|  Hybrid Model   |   Best equity scores             |  Best balance for Direction A       |
+
+### 4.3 Decision threshold and acceptance rules
+
+To make the recommendation more transparent, each configuration is assessed against minimum acceptance rules. A design should not be recommended only because it has the lowest average waiting time. It must also satisfy fairness, inclusivity, robustness, and practicality requirements.
+
+In this report, the main acceptance rules are:
+
+| Criterion    | Acceptance rule                                                                                  |
+|:-------------|:-------------------------------------------------------------------------------------------------|
+| Efficiency   | Overall average waiting time should remain low                                                   |
+| Fairness     | The worst-off stakeholder group should not experience excessive waiting time or low equity score |
+| Inclusivity  | Users who prefer or require unisex access should be reasonably supported                         |
+| Robustness   | Performance should not collapse under the early burst-arrival stress test                        |
+| Practicality | The design should be feasible for management to operate                                          |
+
+This threshold-based framework is used to avoid selecting a configuration based on one strong metric only. For example, a design with low average waiting time may still be unsuitable if it removes important user choice or leaves one group worse off.
+
+### 4.4 Recommendation based on the decision framework
+
+Based on the decision framework, the recommended configuration is the **Hybrid Model**.
+
+This option is selected because it provides the strongest balance between operational performance and preference-based fairness. It keeps waiting time operationally acceptable while also supporting users who prefer gender-segregated facilities and users who prefer or require all-gender access.
+
+The **Status Quo** is not recommended because it does not sufficiently address the inclusivity concern and provides no unisex access. The **All Unisex** configuration is also not selected as the final recommendation because, although it is the most efficient option, it removes gender-segregated choice. Since the business problem includes both congestion and inclusive design, waiting-time efficiency alone is not enough to justify All Unisex as the final recommendation.
+
+Therefore, management should adopt the **Hybrid Model** as the preferred design.
+
+### 4.5 Why the simulation specification is realistic
+
+The simulation specification is realistic because concert intermissions do not usually produce smooth arrivals. Many patrons leave their seats immediately when the intermission begins, so modelling 80% of restroom users arriving in the first 5 minutes reflects a plausible high-pressure scenario.
+
+The female-dominant burst is also reasonable because different event types may attract different audience mixes, and women have longer average service times in the case data. Changing the gender composition of the burst group therefore changes the service-time distribution and tests whether each configuration remains robust under a more difficult demand pattern.
+
+The use of Gamma service times is also suitable because restroom service time must be positive and may be right-skewed, with most users taking a short time but some users requiring longer. This also keeps the Stage 2 simulation aligned with the Stage 1 M/G/k modelling approach, where service time is treated as a general distribution rather than a fixed value.
+
+### 4.6 Business risks and unintended consequences
+
+Implementing the Hybrid Model may create some business risks. First, if signage is unclear, users may not understand which facilities they can use, and the unisex capacity may be underused. Second, if the number of unisex stalls is too small, users who prefer unisex facilities may still experience long waits. Third, some users may resist a change from the current layout, especially if communication about the purpose of the redesign is poor.
+
+There is also a risk that the Hybrid Model improves preference-based fairness but does not reduce waiting time as much as All Unisex. Therefore, management should not treat the layout change alone as a complete solution. The design should be supported by clear signage, queue monitoring, and staff guidance during busy intermissions.
+
+### 4.7 Requirements for production use
+
+If management wants to use this analytics approach in production, several requirements are needed. First, the venue should collect real queue data during intermissions, including arrival times, approximate waiting times, and completion rates. Second, the venue should collect anonymous user feedback about restroom preferences and accessibility needs. Third, the simulation should be updated with real observed data instead of relying only on case assumptions.
+
+The model should also be tested across different event types, such as family shows, concerts with different audience demographics, and sold-out performances. This would help management understand whether the Hybrid Model remains robust across different demand patterns.
+
+Finally, the analytics solution should be easy to update. Management should be able to adjust inputs such as audience size, gender mix, intermission length, number of facilities, and user preference proportions. This would allow the simulation to support future planning, not only this one design decision.
+
+These requirements would allow management to monitor whether the Hybrid Model continues to perform well after implementation and to update the simulation when real data becomes available.
+
 # 5. Conclusion and further suggested work
+
 ## 5.1 Final Conclusion
 Our investigation concludes that Configuration 3 (Hybrid Model) is the superior choice for the concert hall. It successfully navigates the "Intermission Challenge" by maintaining the high-efficiency throughput of Men’s urinals while providing the flexible, inclusive capacity of 10 universal stalls. This configuration is unique in that it represents a Pareto improvement over the Status Quo, it is simultaneously more efficient (Totalitarian) and more just (Rawlsian). Implementation will resolve long-standing customer complaints regarding both wait times and a lack of inclusive design. The consistent performance of the Hybrid Model across all four stress-test scenarios (Early/Late Bursts and Male/Female Dominance) provides management with a robust, data-driven mandate for restroom redesign.
 
