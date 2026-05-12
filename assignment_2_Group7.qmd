@@ -593,6 +593,20 @@ service_sd_men_class2 <- 3.2
 #| label: tbl-stage2-scenario-setup
 #| include: false
 
+stage2_scenarios <- tibble(
+  scenario = c(
+    "Men first 5",
+    "Men last 5",
+    "Women first 5",
+    "Women last 5"
+  ),
+  burst_timing = c("early", "late", "early", "late"),
+  dominant_gender = c("M", "M", "W", "W"),
+  dominant_prop = 0.80,
+  burst_prop = 0.80,
+  class2_prob = 0.05
+)
+
 stage2_scenarios |>
   mutate(
     dominant_gender = recode(
