@@ -1524,15 +1524,17 @@ These requirements would allow management to monitor whether the Hybrid Model co
 
 ## 5.1 Final Conclusion
 
-Our investigation concludes that Configuration 3 (Hybrid Model) is the superior choice for the concert hall. It successfully navigates the "Intermission Challenge" by maintaining the high-efficiency throughput of Men’s urinals while providing the flexible, inclusive capacity of 10 universal stalls. This configuration is unique in that it represents a Pareto improvement over the Status Quo, it is simultaneously more efficient (Totalitarian) and more just (Rawlsian). Implementation will resolve long-standing customer complaints regarding both wait times and a lack of inclusive design. The consistent performance of the Hybrid Model across all four stress-test scenarios (Early/Late Bursts and Male/Female Dominance) provides management with a robust, data-driven mandate for restroom redesign.
+Our investigation identifies the Hybrid Model (Configuration 3) as the superior solution for the concert hall. The simulation results confirm that the Status Quo (Configuration 1) is operationally fragile and socially inadequate; it fails to absorb demand surges and completely lacks the inclusive design required to address modern patron expectations and complaints.
 
-In the other hand, The simulation results reveal that the Status Quo (Config 1) is operationally fragile. Under "Early Burst" conditions, the system fails to absorb the rush, leading to extreme stakeholder disparity. Conversely, while the All Unisex model (Config 2) promotes total inclusivity, it often suffers from "efficiency leakage" where high service-time variance from Class 2 patrons spills over into the general population, lowering the satisfaction of standard users.
+While the All Unisex (Configuration 2) model offers the lowest raw waiting times through total resource pooling, it suffers from "efficiency leakage", where high-variance service times from Class 2 patrons negatively impact the experience of standard users.
+
+In contrast, the Hybrid Model successfully navigates the "Intermission Challenge" by preserving the high-efficiency throughput of Men’s urinals while introducing 10 universal stalls to ensure flexibility and inclusivity. By consistently achieving the highest Totalitarian (efficiency) and Rawlsian (fairness) equity scores across all stress tests, the Hybrid Model provides a robust, data-driven mandate for facility redesign that balances operational speed with social justice.
 
 ## 5.2 Limitations and Future Work
 
 This analysis operates under specific constraints that need further study:
 
--   Cost Analysis: Excellent business addition. While the Hybrid Model wins on utility, it requires physical renovation (moving walls, changing signs). Management needs a Net Present Value (NPV) or ROI analysis comparing the cost of renovation against the "cost of customer dissatisfaction."
+-   Cost Analysis: Excellent business addition. While the Hybrid Model wins on utility, it requires physical renovation (moving walls, structural changes changing signs). Management needs a Net Present Value (NPV) or ROI analysis comparing the cost of renovation against the "cost of customer dissatisfaction."
 
 -   Different Event Types: A "K-Pop" concert might be 90% female, while a "Heavy Metal Concerts" might be 90% male. Improvement: Suggest a Sensitivity Analysis on the perc_male variable to find the "breaking point" for each configuration.
 
