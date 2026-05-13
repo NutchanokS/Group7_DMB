@@ -135,51 +135,74 @@ This two-stage approach ensures that recommendations hold not only under ideal c
 
 The central analytics problem is to determine which restroom configuration minimises patron waiting time and maximises equitable satisfaction across stakeholder groups, subject to the fixed 40-unit capacity constraint and the strict 25-minute intermission window. Based on the case data, each gender arrives at a rate of 3.2 patrons per minute, giving a combined arrival rate of λ = 6.4 patrons per minute across all genders (overall population rate).
 
-To robustly evaluate the three restroom configurations, this study employs a two-stage analytical framework. We transition from a highly structured, static queueing model to a dynamic, stochastic simulation designed to stress-test the configurations under realistic, peak-demand intermission pressures.
+To robustly evaluate the three restroom configurations, this study employs a two-stage analytical framework as seen in @fig-two-stage. We transition from a highly structured, static queueing model to a dynamic, stochastic simulation designed to stress-test the configurations under realistic, peak-demand intermission pressures.
 
-![](images/paste-9.png)
-
-\[xxx-placeholder for visual flowchart of the two-stage analytical framework-xxx\]
+![The Two-Stage Analytical Framework](images/paste-9.png){#fig-two-stage}
 
 The primary measures of success for this analysis are: (1) Totalitarian Satisfaction Score (Tr), measuring aggregate patron satisfaction across all groups; (2) Rawlsian Satisfaction Score (Mr), measuring the satisfaction of the worst-off patron group; and (3) Incompletion Rate, measuring the proportion of patrons unable to complete their restroom visit within the intermission window.
 
 Supporting these primary measures, fundamental queueing metrics including average waiting time (Wq), average queue length (Lq), and server utilisation (ρ) are reported for each configuration to provide operational context and validate the satisfaction score calculations.
 
-## 3.1 Model Parameter and Assumptions
+## 2.1 Case Parameter and Assumptions
 
-Before presenting results, this section summarises the input parameters and modelling assumptions applied consistently across all configurations and scenarios. These values are derived directly from the historical observation data provided in the case.
+All model inputs are drawn from historical operational data observed at the
+venue. The following tables consolidate the key parameters and configurations
+used across both stages of the analysis, serving as the reference point
+for all subsequent modelling.
 
-### 3.1.1 Input Parameters
+### 2.1.1 Input Parameters
 
-**Table 1 — Observed Input Parameters**
+**Table 1 — Observed Arrival and Service Time Parameters**
 
-![](images/paste-2.png){fig-align="center" width="449"}
+| Parameter | Women | Men |
+|:---|:---:|:---:|
+| Total arrival rate (Poisson, patrons/min) | 3.2 | 3.2 |
+| Class 2 probability | 5% | 5% |
+| Class 1 mean service time (min) | 1.67 | 0.833 |
+| Class 1 service time SD (min) | 1.20 | 0.700 |
+| Class 2 mean service time (min) | 5.20 | 5.200 |
+| Class 2 service time SD (min) | 3.20 | 3.200 |
 
-**Table 2 — User Preference Distribution**
+*The combined arrival rate across both genders is λ = 6.4 patrons/min,
+yielding a total patron volume of N = 160 over the 25-minute intermission.*
 
-| Preference Type        | Proportion |
-|:-----------------------|:----------:|
-| Gender-segregated (GS) |    70%     |
-| No preference (NP)     |    21%     |
-| Unisex (UX)            |     9%     |
+**Table 2 - Facility Preference Distribution**
 
-> Applies equally to both genders and across all configurations.
++------------------------+----------------------+-----------------------+
+| Preference Type        | Men                  | Women                 |
++:=======================+:====================:+:=====================:+
+| Gender-segregated (GS) | 70%                  | 70%                   |
++------------------------+----------------------+-----------------------+
+| No preference (NP)     | 21%                  | 21%                   |
++------------------------+----------------------+-----------------------+
+| Unisex (UX)            | 9%                   | 9%                    |
++------------------------+----------------------+-----------------------+
 
 **Table 3 — User Satisfaction Score Table**
 
 ![](images/paste-1.png)
 
+*Scores are mapped using the bracket of the patron's actual
+wait time.*
+
 **Table 4 — Configuration Fixture Allocation**
 
-| Restroom Type  | Config 1 | Config 2 | Config 3 |
-|:---------------|:--------:|:--------:|:--------:|
-| Women's stalls |    20    |    \-    |    15    |
-| Men's urinals  |    10    |    \-    |    10    |
-| Men's stalls   |    10    |    \-    |    5     |
-| Unisex stalls  |    \-    |    40    |    10    |
-| **Total**      |  **40**  |  **40**  |  **40**  |
++----------------+------------------+------------------+------------------+
+| Restroom Type  | Configuration 1\ | Configuration 2\ | Configuration 3\ |
+|                | Status Quo       | All Unisex       | Hybrid           |
++:===============+:================:+:================:+:================:+
+| Women's stalls | 20               | \-               | 15               |
++----------------+------------------+------------------+------------------+
+| Men's urinals  | 10               | \-               | 10               |
++----------------+------------------+------------------+------------------+
+| Men's stalls   | 10               | \-               | 5                |
++----------------+------------------+------------------+------------------+
+| Unisex stalls  | \-               | 40               | 10               |
++----------------+------------------+------------------+------------------+
+| **Total**      | **40**           | **40**           | **40**           |
++----------------+------------------+------------------+------------------+
 
-### 3.1.2 Modelling Assumptions
+### 2.1.2 General Modelling Assumptions
 
 The following assumptions are applied throughout the analysis:
 
@@ -187,13 +210,16 @@ The following assumptions are applied throughout the analysis:
 
 -   Service times are treated as a general distribution, characterised by the empirically observed mean and SD from the historical data.
 
--   For the baseline analysis, no-preference users are assumed to split equally (50-50) between gender-segregated and unisex facilities where available. In the simulation scenarios, this routing rule is replaced by a shortest queue length rule or shortest expected wait time rule, reflecting more realistic decision-making behaviour under congestion.
+-   No-preference users are assumed to split equally (50:50) between gender-segregated and unisex facilities where available. In the simulation scenarios.
 
--   Gender-diverse patrons are acknowledged qualitatively but excluded from quantitative scoring due to the absence of arrival rate data in the historical observations.
+- The intermission window is fixed at 25 minutes. Any patron whose
+  combined wait time and service time exceeds this threshold is recorded
+  as incomplete, representing a patron unable to return to their
+  seat before the next act begins.
 
 -   Steady-state conditions are assumed for the baseline analytical model.
 
-## 2.1 Stage 1: Steady-State Modeling
+## 2.2 Stage 1: Steady-State Modeling
 
 We begin by establishing a theoretical baseline using analytical queueing equations. To set a clean, idealised benchmark, Stage 1 assumes a perfectly balanced 50:50 gender demographic split and a Poisson arrival rate throughout the intermission, meaning patrons arrive at a constant average rate (λ) over the entire break with no sudden rushes.
 
@@ -245,7 +271,7 @@ We apply this $M/G/k$ mathematical framework to evaluate the expected waiting ti
 
 This initial steady-state analysis is used as a critical theoretical baseline to ensure that the 40-stall capacity is, at least theoretically, sufficient to accommodate the audience under perfect operating conditions. By proving that the system functions mathematically when arrivals are stable and uniform, we establish a baseline of viability. This sets the stage for Stage 2, where we can directly measure the impact of dynamic arrival shocks.
 
-## 2.2 Stage 2: Stress-Test Scenario Design
+## 2.3 Stage 2: Stress-Test Scenario Design
 
 To ensure our recommendations are resilient, we subject each restroom configuration to dynamic simulation testing. While the steady-state equations in Stage 1 establish baseline viability, real-world intermission behaviour is highly volatile. To make our simulation results directly comparable to our Stage 1 baseline, we keep the total volume of restroom demand constant.
 
@@ -321,11 +347,11 @@ By crossing these demographic profiles with the timing distributions, we establi
 
 To ensure statistical reliability and smooth out stochastic variation, each of the 12 experimental combinations (3 Configurations in each of 4 Scenarios) is executed across 500 replications with different random seeds, allowing us to compute expected averages and 95% confidence intervals for all performance metrics.
 
-## 2.3 Stage 2: Discrete-Event Simulation (DES) Architecture
+## 2.4 Stage 2: Discrete-Event Simulation (DES) Architecture
 
 To execute the stress-test scenarios, we construct a stochastic Discrete-Event Simulation (DES) in R. This section details the technical framework of our simulation, shifting from *what* we are simulating to *how* the program executes. We design this engine using a modular process approach to manage the pipeline and code execution to model the differences in scenario's arrival profile and routing across the configurations.
 
-### 2.3.1 The Modular Process Approach
+### 2.4.1 The Modular Process Approach
 
 The simulation engine is designed using a clean modular framework. To keep execution reproducible, we decouple the generation of patron data from the routing logic. This process is split into three core blocks wrapped inside a statistical replication loop:
 
@@ -367,7 +393,7 @@ Once a simulation run concludes, the calculation engine processes the raw output
 
 To smooth out random variation and ensure statistical confidence, this entire three-part pipeline is wrapped in a loop that runs 500 independent replications for each simulation setup. This allows us to compute highly reliable expected averages and $95\%$ confidence intervals.
 
-### 2.3.2 Configuration Differences and Design Loops
+### 2.4.2 Configuration Differences and Design Loops
 
 While our four stress-test scenarios differ purely in the *inputs* generated by the DGP (adjusting parameters for arrival times and gender mixes), the three restroom layouts differ fundamentally in their *routing logic*. This structural variation is programmed directly into the simulation's queue-routing loop, reflecting the physical differences between the layouts:
 
@@ -401,7 +427,7 @@ The Hybrid Model represents the most complex design loop, splitting the restroom
 
 \[xxx-placeholder for visual flowchart of the configuration 3 routing logic-xxx –\> 50:50 no pereferenc split in DGPx\] \[xxx-placeholder for visual flowchart of the configuration 3 simulation-xxx\]
 
-### 2.3.3 Combining the DGP and Routing Logic: The Execution Matrix
+### 2.4.3 Combining the DGP and Routing Logic: The Execution Matrix
 
 We program the 4 DGP Arrival Profiles (Scenarios) as standardized input datasets and the 3 Configuration Routing (RL) as independent functions. This allows a single controller function to systematically cross-evaluate the inputs against the logic in a clean, automated pipeline.
 
@@ -424,11 +450,11 @@ This modular architecture maps directly to the execution matrix below, showing h
 
 Based on this execution matrix, with 4 DGP scenarios and 3 routing configurationsm we run 12 simulation in total, each repeated across 500 replications. The full code is provided in the Appendix, with key snippets highlighted in the main report to illustrate how the modular architecture is implemented.
 
-## 2.4 Social Welfare Framework (The Fairness Metrics)
+## 2.5 Social Welfare Framework (The Fairness Metrics)
 
 To evaluate our configurations under an ethical and operational lens, we translate the simulated waiting times, facility assignments, and patron preferences into formal measures of stakeholder satisfaction from the established user preference satisfaction matrix (spanning scores from $0$ to $5$).
 
-### 2.4.1 The 25-Minute Threshold and Incompletion Rate (Supplementary Metric)
+### 2.5.1 The 25-Minute Threshold and Incompletion Rate (Supplementary Metric)
 
 While our primary objectives are maximizing overall crowd satisfaction and protecting minority demographics, we also capture a critical operational risk metric: incompletion rate.
 
@@ -436,7 +462,7 @@ Because the intermission is a strict 25-minute window, a patron's total time in 
 
 Introducing this metric allows us to evaluate the real-world likelihood of patrons missing the start of the next act. This acts as a vital sanity check, ensuring we do not recommend a layout that achieves high average satisfaction scores while leaving a portion of the audience unable to return to their seats before the next act begins.
 
-### 2.4.2 Totalitarian Satisfaction: Overall Patron Welfare ($T_r$)
+### 2.5.2 Totalitarian Satisfaction: Overall Patron Welfare ($T_r$)
 
 The Totalitarian metric evaluates the global performance of the restroom by maximizing the collective satisfaction of the entire crowd. For a given restroom design option $r$, we define $s^r_{kij}$ as the discrete satisfaction score (ranging from $0$ to $5$) mapped from our satisfaction matrix based on:
 
@@ -451,7 +477,7 @@ $$T_r = \sum_{k \in K} \sum_{i \in I} \sum_{j \in J} a^r_{kij} s^r_{kij}, \quad 
 
 The analytical goal under this framework is to **maximize** $T_r$. While this score serves as our primary KPI for total system throughput and overall satisfaction, it evaluates global satisfaction without considering how that satisfaction is distributed among different groups.
 
-### 2.4.3 Rawlsian Fairness: Minimum Group Satisfaction ($M_r$)
+### 2.5.3 Rawlsian Fairness: Minimum Group Satisfaction ($M_r$)
 
 To evaluate equity and fairness, we apply a Rawlsian ethical lens. Instead of viewing the crowd as a single, uniform collective, this metric evaluates the layout's performance from the perspective of the most disadvantaged active stakeholder group.
 
@@ -1468,19 +1494,17 @@ To make the recommendation more transparent, each configuration is assessed usin
 
 In this report, the main decision considerations are:
 
-+--------------+--------------------------------------------------------------------------------------------------+
-| Criterion    | Scope of consideration                                                                                  |
-+:=============+:=================================================================================================+
-| Efficiency   | Overall average waiting time should remain low                                                   |
-+--------------+--------------------------------------------------------------------------------------------------+
-| Fairness     | The worst-off stakeholder group should not experience excessive waiting time or low equity score |
-+--------------+--------------------------------------------------------------------------------------------------+
-| Inclusivity  | Users who prefer or require unisex access should be reasonably supported                         |
-+--------------+--------------------------------------------------------------------------------------------------+
-| Robustness   | Performance should not collapse under the early burst-arrival stress test                        |
-+--------------+--------------------------------------------------------------------------------------------------+
-| Practicality | The design should be feasible for management to operate                                          |
-+--------------+--------------------------------------------------------------------------------------------------+
++--------------+--------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|              | Criterion :============= Efficiency                                                              | Scope of consideration :=================================================================================================+ Overall average waiting time should remain low \| |
++--------------+--------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Fairness     | The worst-off stakeholder group should not experience excessive waiting time or low equity score |                                                                                                                                                                              |
++--------------+--------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Inclusivity  | Users who prefer or require unisex access should be reasonably supported                         |                                                                                                                                                                              |
++--------------+--------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Robustness   | Performance should not collapse under the early burst-arrival stress test                        |                                                                                                                                                                              |
++--------------+--------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Practicality | The design should be feasible for management to operate                                          |                                                                                                                                                                              |
++--------------+--------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 This framework is used to avoid selecting a configuration based on one strong metric only. Since this report follows Direction A, fairness and stakeholder disparity are given higher priority than waiting-time efficiency alone. Therefore, the final decision should balance queueing performance with inclusive access and preference-based fairness.
 
