@@ -1430,13 +1430,19 @@ final_summary_table |>
 
 @tbl-final-summary provides a compact comparison for the business decision. Operational risk is represented by the proportion of users not completed by 25 minutes, while equity performance is represented by the Totalitarian and Rawlsian scores. The ranking columns show how each configuration performs relative to the others within each scenario.
 
-# 4. Discussions of results and business recommendation
+# 4. Discussion of results and business recommendation
 
 ### 4.1 Key findings from the results
 
-The Stage 2 stress-test results show a clear trade-off between operational efficiency and preference-based fairness. Under the early female-dominant burst scenario, the All Unisex configuration gives the strongest waiting-time performance. This is because all 40 restroom units are pooled into one shared system, so available capacity can be used by any user.
+The overall results compare the three configurations across the baseline setting and four surge-demand simulation scenarios. The findings show a clear trade-off between queueing efficiency and preference-based fairness.
 
-However, when fairness is measured using Totalitarian and Rawlsian equity scores, the Hybrid Model performs better. This suggests that although All Unisex is faster, the Hybrid Model provides a stronger balance between waiting-time performance, user preference, and inclusivity.
+Across the surge-demand scenarios, the All Unisex configuration gives the strongest waiting-time performance. This is because all 40 restroom units are pooled into one shared system, allowing capacity to be used more flexibly by all users. This is especially clear in the early surge scenarios, where All Unisex records the lowest mean waiting time.
+
+However, the Hybrid Model performs best on the equity-based measures. Across the baseline and all four stress-test scenarios, the Hybrid Model ranks first for both Totalitarian and Rawlsian scores. This means it provides the strongest average preference-based experience while also protecting the worst-off stakeholder group.
+
+The results also show that late-arrival surge scenarios are more operationally difficult than early-arrival scenarios. When most users arrive in the last 5 minutes, a higher proportion of users are not completed before the 25-minute intermission ends. This suggests that demand timing is an important operational risk for management.
+
+Overall, the results suggest the same decision direction across scenarios: All Unisex is the strongest option for pure queueing efficiency, Status Quo is the weakest option for inclusivity, and the Hybrid Model is the most balanced option when fairness, inclusivity, and stakeholder preference are included.
 
 ### 4.2 Business interpretation
 
@@ -1456,14 +1462,14 @@ Therefore, the result should not be interpreted as “All Unisex is best overall
 | Hybrid Model  | Best equity scores           | Best balance for Direction A      |
 +---------------+------------------------------+-----------------------------------+
 
-### 4.3 Decision threshold and acceptance rules
+### 4.3 Decision framework
 
-To make the recommendation more transparent, each configuration is assessed against minimum acceptance rules. A design should not be recommended only because it has the lowest average waiting time. It must also satisfy fairness, inclusivity, robustness, and practicality requirements.
+To make the recommendation more transparent, each configuration is assessed using a clear scope of consideration. A design should not be recommended only because it has the lowest average waiting time. It should also be considered in terms of fairness, inclusivity, robustness, and practicality.
 
-In this report, the main acceptance rules are:
+In this report, the main decision considerations are:
 
 +--------------+--------------------------------------------------------------------------------------------------+
-| Criterion    | Acceptance rule                                                                                  |
+| Criterion    | Scope of consideration                                                                                  |
 +:=============+:=================================================================================================+
 | Efficiency   | Overall average waiting time should remain low                                                   |
 +--------------+--------------------------------------------------------------------------------------------------+
@@ -1476,7 +1482,7 @@ In this report, the main acceptance rules are:
 | Practicality | The design should be feasible for management to operate                                          |
 +--------------+--------------------------------------------------------------------------------------------------+
 
-This threshold-based framework is used to avoid selecting a configuration based on one strong metric only. For example, a design with low average waiting time may still be unsuitable if it removes important user choice or leaves one group worse off.
+This framework is used to avoid selecting a configuration based on one strong metric only. Since this report follows Direction A, fairness and stakeholder disparity are given higher priority than waiting-time efficiency alone. Therefore, the final decision should balance queueing performance with inclusive access and preference-based fairness.
 
 ### 4.4 Recommendation based on the decision framework
 
@@ -1490,17 +1496,19 @@ Therefore, management should adopt the **Hybrid Model** as the preferred design.
 
 ### 4.5 Why the simulation specification is realistic
 
-The simulation specification is realistic because concert intermissions do not usually produce smooth arrivals. Many patrons leave their seats immediately when the intermission begins, so modelling 80% of restroom users arriving in the first 5 minutes reflects a plausible high-pressure scenario.
+The simulation specification is realistic because concert intermissions do not usually produce smooth arrivals. Many patrons may leave their seats immediately when intermission begins, while others may delay restroom use until closer to the end of the break. Therefore, modelling both first-5-minute and last-5-minute surge scenarios reflects plausible high-pressure demand patterns.
 
-The female-dominant burst is also reasonable because different event types may attract different audience mixes, and women have longer average service times in the case data. Changing the gender composition of the burst group therefore changes the service-time distribution and tests whether each configuration remains robust under a more difficult demand pattern.
+The gender-dominant burst scenarios are also reasonable because different event types may attract different audience mixes. Since men and women have different service-time distributions in the case data, changing the gender composition of the surge group changes the overall service-time distribution and tests whether each configuration remains robust under different stakeholder mixes.
 
 The use of Gamma service times is also suitable because restroom service time must be positive and may be right-skewed, with most users taking a short time but some users requiring longer. This also keeps the Stage 2 simulation aligned with the Stage 1 M/G/k modelling approach, where service time is treated as a general distribution rather than a fixed value.
 
 ### 4.6 Business risks and unintended consequences
 
-Implementing the Hybrid Model may create some business risks. First, if signage is unclear, users may not understand which facilities they can use, and the unisex capacity may be underused. Second, if the number of unisex stalls is too small, users who prefer unisex facilities may still experience long waits. Third, some users may resist a change from the current layout, especially if communication about the purpose of the redesign is poor.
+Implementing the Hybrid Model may create some practical business risks. First, if signage is unclear, users may not understand which facilities they are allowed to use. This could lead to confusion during the short intermission and may cause the unisex stalls to be underused. Second, although the Hybrid Model includes 10 unisex stalls, this capacity may not be sufficient for every event type or audience mix. For example, events with a higher proportion of users who prefer or require unisex facilities may still create long queues for the unisex option. Third, some users may resist changes from the current layout, especially if the purpose of the redesign is not clearly communicated.
 
-There is also a risk that the Hybrid Model improves preference-based fairness but does not reduce waiting time as much as All Unisex. Therefore, management should not treat the layout change alone as a complete solution. The design should be supported by clear signage, queue monitoring, and staff guidance during busy intermissions.
+There is also a risk that the Hybrid Model improves preference-based fairness but does not reduce waiting time as much as the All Unisex configuration. Therefore, management should not treat the layout change alone as a complete solution. The design should be supported by clear signage, queue monitoring, and staff guidance during busy intermissions, especially when demand is concentrated in the first few minutes.
+
+Future data may also change the recommendation or the expected performance of each configuration. The simulation is based on assumed preference proportions, service-time distributions, and arrival patterns. In practice, different performances may attract different audience profiles, and users’ restroom preferences may change over time. For example, a future event may have more users who prefer unisex access, more users with longer service-time needs, or a different arrival pattern during intermission. Because of this, management should collect real usage data after implementation, including queue lengths, waiting times, facility usage, and user feedback. This would allow the simulation to be updated and help management check whether the Hybrid Model continues to perform well in practice.
 
 ### 4.7 Requirements for production use
 
