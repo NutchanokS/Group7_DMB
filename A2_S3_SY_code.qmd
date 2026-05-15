@@ -1,0 +1,1562 @@
+---
+title: "The Intermission Challenge Group 7"
+subtitle: "ETF3480 - ETF5480 Assignment 2"
+author:
+  - "Tzu-Hsuan Yang (35461586)"
+  - "Nutchanok Saitin (35493011)"
+  - "Mohammad Zulkifli Falaqi ()"
+  - "Bagas Wibawanto ()"
+toc-depth: 5
+number-depth: 5
+format:
+  pdf:
+    pdf-engine: lualatex
+    documentclass: scrartcl
+    classoption: ["11pt", "onecolumn"]
+    geometry:
+      - a4paper
+      - margin=20mm
+    number-sections: false
+    colorlinks: true
+    include-in-header:
+      text: |
+        % --- Title page formatting ---
+        \setkomafont{title}{\LARGE\bfseries}
+        \setkomafont{subtitle}{\fontsize{16pt}{11pt}\selectfont}
+        \setkomafont{author}{\fontsize{12pt}{8pt}\selectfont}
+
+        % --- Spacing: lines + paragraphs ---
+        \usepackage{setspace}
+        \setstretch{1.08}
+        \KOMAoptions{parskip=half}
+
+        % --- Optional: nicer text handling ---
+        \usepackage{microtype}
+
+        % --- Improve section heading clarity ---
+        \usepackage{xcolor}
+        \definecolor{sectionblue}{HTML}{1A237E}
+        \definecolor{subhdgray}{gray}{0.25}
+
+        \usepackage{titlesec}
+
+        % \section
+        \titleformat{\section}
+          {\normalfont\Large\bfseries\color{sectionblue}}{}{0em}{}
+        \titlespacing*{\section}{0pt}{16pt plus 2pt minus 2pt}{10pt}
+
+        % \subsection
+        \titleformat{\subsection}
+          {\normalfont\large\bfseries\color{subhdgray}}{}{0em}{}
+        \titlespacing*{\subsection}{0pt}{14pt plus 2pt minus 2pt}{8pt}
+
+        % \subsubsection
+        \titleformat{\subsubsection}
+          {\normalfont\normalsize\bfseries\color{subhdgray}}{}{0em}{}
+        \titlespacing*{\subsubsection}{0pt}{12pt plus 1pt minus 2pt}{6pt}
+
+        % \paragraph = ####
+        \titleformat{\paragraph}
+          {\normalfont\normalsize\bfseries\color{subhdgray}}{}{0em}{}
+        \titlespacing*{\paragraph}{0pt}{10pt plus 1pt minus 1pt}{4pt}
+
+        % \subparagraph = #####
+        \titleformat{\subparagraph}
+          {\normalfont\normalsize\itshape\color{subhdgray}}{}{0em}{}
+        \titlespacing*{\subparagraph}{0pt}{8pt plus 1pt minus 1pt}{4pt}
+
+        % --- Styled quote block with subtle bar ---
+        \usepackage[most]{tcolorbox}
+        \definecolor{quotebar}{gray}{0.70}
+        \newtcolorbox{myquote}{enhanced,breakable,
+          colback=white, colframe=quotebar,
+          left=8pt, right=6pt, top=4pt, bottom=4pt,
+          boxrule=0pt, leftrule=2pt, rightrule=0pt, toprule=0pt, bottomrule=0pt}
+        \renewenvironment{quote}{\begin{myquote}\itshape}{\end{myquote}}
+        
+
+mainfont: "Arial"
+sansfont: "Arial"
+linestretch: 1.02
+papersize: a4
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+knitr::opts_chunk$set(echo = TRUE, eval=TRUE, error=TRUE, cache=FALSE)
+```
+
+## 3.2 Simulation stress-test design
+
+The baseline results above describe performance under idealised steady-state conditions. To test whether these findings remain robust under realistic intermission pressure, four surge-demand scenarios are simulated. Each scenario assumes that 80% of restroom users arrive within a five-minute burst window, while the remaining 20% arrive across the rest of the intermission.
+
+### 3.2.1 Scenario setup
+
+The four scenarios vary by two factors: burst timing and dominant gender group. The burst timing is either early, where 80% of users arrive in the first five minutes, or late, where 80% of users arrive in the final five minutes. For each timing pattern, the burst group is either men-dominant or women-dominant. Early-burst scenarios test whether each configuration can absorb a sudden queue at the start of intermission, while late-burst scenarios test whether users can still complete restroom use before the 25-minute intermission ends. The men- and women-dominant scenarios test whether configuration performance changes when peak demand is concentrated among different user groups.
+
+@tbl-stage2-scenario-setup summarises the four surge-demand scenarios used in the simulation.
+
+```{r}
+#| label: setup-and-parameters
+#| include: false
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(patchwork)
+
+seed1 <- 123
+n_rep <- 500
+intermission_length <- 25
+
+lambda_women <- 3.2
+lambda_men <- 3.2
+
+pref_GS <- 0.70
+pref_NP <- 0.21
+pref_UX <- 0.09
+
+prob_class2 <- 0.05
+
+service_mean_women_class1 <- 1.67
+service_sd_women_class1 <- 1.2
+
+service_mean_women_class2 <- 5.2
+service_sd_women_class2 <- 3.2
+
+service_mean_men_class1 <- 0.833
+service_sd_men_class1 <- 0.7
+
+service_mean_men_class2 <- 5.2
+service_sd_men_class2 <- 3.2
+```
+
+```{r}
+stage2_scenarios <- tibble( 
+
+  scenario = c( 
+
+    "Men early", 
+
+    "Men late", 
+
+    "Women early", 
+
+    "Women late" 
+
+  ), 
+
+  burst_timing = c( 
+
+    "early", 
+
+    "late", 
+
+    "early", 
+
+    "late" 
+
+  ), 
+
+  dominant_gender = c( 
+
+    "M", 
+
+    "M", 
+
+    "W", 
+
+    "W" 
+
+  ), 
+
+  dominant_prop = c( 
+
+    0.80, 
+
+    0.80, 
+
+    0.80, 
+
+    0.80 
+
+  ), 
+
+  burst_prop = c( 
+
+    0.80, 
+
+    0.80, 
+
+    0.80, 
+
+    0.80 
+
+  ), 
+
+  class2_prob = c( 
+
+    0.05, 
+
+    0.05, 
+
+    0.05, 
+
+    0.05 
+
+  ) 
+
+) 
+
+ 
+
+stage2_scenarios %>% 
+
+  mutate( 
+
+    burst_timing = recode( 
+
+      burst_timing, 
+
+      "early" = "Early (first 5 mins)", 
+
+      "late" = "Late (last 5 minutes)" 
+
+    ), 
+
+    dominant_gender = recode( 
+
+      dominant_gender, 
+
+      "M" = "Men", 
+
+      "W" = "Women" 
+
+    ), 
+
+    dominant_prop = paste0(dominant_prop * 100, "%"), 
+
+    burst_prop = paste0(burst_prop * 100, "%"), 
+
+    class2_prob = paste0(class2_prob * 100, "%") 
+
+  ) %>% 
+
+  kable( 
+
+    format = "latex", 
+
+    booktabs = FALSE, 
+
+    caption = "Stage 2 surge-demand simulation scenarios.", 
+
+    col.names = c( 
+
+      "Scenario", 
+
+      "Burst Timing", 
+
+      "Dominant Group", 
+
+      "Dominant Group Share", 
+
+      "Burst Arrival Share", 
+
+      "Class 2 probability" 
+
+    ), 
+
+    align = c("c", "c", "c", "c", "c", "c") 
+
+  ) %>% 
+
+  kable_styling( 
+
+    latex_options = c("hold_position", "scale_down"), 
+
+    font_size = 8, 
+
+    full_width = FALSE 
+
+  ) %>% 
+
+  row_spec(0, bold = TRUE, background = "#D9EAF7") %>% 
+
+  column_spec(1:6, border_left = TRUE, border_right = TRUE) 
+```
+
+```{r}
+#| label: tbl-stage2-scenario-setup
+#| echo: false
+#| warning: false
+#| tbl-cap: "Stage 2 surge-demand simulation scenarios."
+
+stage2_scenarios <- tibble(
+  scenario = c("Men early", "Men late", "Women early", "Women late"),
+  burst_timing = c("early", "late", "early", "late"),
+  dominant_gender = c("M", "M", "W", "W"),
+  dominant_prop = 0.80,
+  burst_prop = 0.80,
+  class2_prob = 0.05
+)
+
+stage2_scenarios |>
+  mutate(
+    dominant_prop = sprintf("%.0f%%", dominant_prop * 100),
+    burst_prop = sprintf("%.0f%%", burst_prop * 100),
+    class2_prob = sprintf("%.0f%%", class2_prob * 100)
+  ) |>
+  kable(
+    booktabs = TRUE,
+    col.names = c(
+      "Scenario",
+      "Burst",
+      "Dominant group",
+      "Dominant share",
+      "Burst share",
+      "Class 2 prob."
+    )
+  ) |>
+  kable_styling(
+    full_width = FALSE,
+    font_size = 8,
+    latex_options = c("hold_position", "scale_down")
+  )
+```
+
+```{r}
+#| label: score-table
+#| include: false
+
+score_table <- data.frame(
+  wait = c(
+    rep(0, 12), rep(5, 12), rep(10, 12), rep(20, 12), rep(40, 12)
+  ),
+  gender = c(
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M"
+  ),
+  preference = c(
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX"
+  ),
+  uses = c(
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX"
+  ),
+  score = c(
+    5,4,5,5,3,5,5,4,5,5,3,5,
+    4,3,4,4,2,4,4,3,4,4,2,4,
+    3,2,2,2,1,3,3,2,2,2,1,3,
+    1,1,1,1,0,2,2,0,1,1,0,2,
+    0,0,0,0,0,1,0,0,0,0,0,1
+  )
+)
+```
+
+```{r}
+#| label: simulation-functions
+#| include: false
+
+# -----------------------------
+# Gamma service time generator
+# -----------------------------
+
+r_service_gamma <- function(n, mean_service, sd_service) {
+  shape <- (mean_service / sd_service)^2
+  scale <- sd_service^2 / mean_service
+  
+  rgamma(n, shape = shape, scale = scale)
+}
+
+# -----------------------------
+# Capacity
+# -----------------------------
+
+get_capacity <- function(config) {
+  
+  if (config == "Status Quo") {
+    return(list(
+      women_stall = 20,
+      men_urinal = 10,
+      men_stall = 10,
+      unisex = 0
+    ))
+  }
+  
+  if (config == "All Unisex") {
+    return(list(
+      women_stall = 0,
+      men_urinal = 0,
+      men_stall = 0,
+      unisex = 40
+    ))
+  }
+  
+  if (config == "Hybrid") {
+    return(list(
+      women_stall = 15,
+      men_urinal = 10,
+      men_stall = 5,
+      unisex = 10
+    ))
+  }
+  
+  stop("Unknown configuration")
+}
+
+# -----------------------------
+# Generate users for one scenario and one replication
+# -----------------------------
+
+generate_stage2_users <- function(
+  rep_id,
+  seed,
+  scenario,
+  burst_timing,
+  dominant_gender,
+  dominant_prop = 0.80,
+  burst_prop = 0.80,
+  class2_prob = 0.05
+) {
+  
+  set.seed(seed)
+  
+  # Fixed expected number of users: (3.2 + 3.2) * 25 = 160
+  n_users <- round((lambda_women + lambda_men) * intermission_length)
+  
+  n_burst <- round(n_users * burst_prop)
+  n_non_burst <- n_users - n_burst
+  
+  if (burst_timing == "early") {
+    burst_arrivals <- runif(n_burst, min = 0, max = 5)
+    non_burst_arrivals <- runif(n_non_burst, min = 5, max = 25)
+  }
+  
+  if (burst_timing == "late") {
+    non_burst_arrivals <- runif(n_non_burst, min = 0, max = 20)
+    burst_arrivals <- runif(n_burst, min = 20, max = 25)
+  }
+  
+  # Gender distribution: burst group is 80% dominant gender;
+  # non-burst group is baseline 50/50.
+  other_gender <- ifelse(dominant_gender == "M", "W", "M")
+  
+  burst_gender <- sample(
+    c(dominant_gender, other_gender),
+    size = n_burst,
+    replace = TRUE,
+    prob = c(dominant_prop, 1 - dominant_prop)
+  )
+  
+  non_burst_gender <- sample(
+    c("W", "M"),
+    size = n_non_burst,
+    replace = TRUE,
+    prob = c(0.5, 0.5)
+  )
+  
+  users <- tibble(
+    rep = rep_id,
+    scenario = scenario,
+    id = 1:n_users,
+    arrival_time = c(burst_arrivals, non_burst_arrivals),
+    arrival_period = c(rep("burst", n_burst), rep("non-burst", n_non_burst)),
+    gender = c(burst_gender, non_burst_gender)
+  ) |>
+    arrange(arrival_time)
+  
+  users$service_class <- sample(
+    c("class1", "class2"),
+    n_users,
+    replace = TRUE,
+    prob = c(1 - class2_prob, class2_prob)
+  )
+  
+  users$preference <- sample(
+    c("GS", "NP", "UX"),
+    n_users,
+    replace = TRUE,
+    prob = c(pref_GS, pref_NP, pref_UX)
+  )
+  
+  users$service_time <- NA_real_
+  
+  users$service_time[users$gender == "W" & users$service_class == "class1"] <-
+    r_service_gamma(
+      sum(users$gender == "W" & users$service_class == "class1"),
+      service_mean_women_class1,
+      service_sd_women_class1
+    )
+  
+  users$service_time[users$gender == "W" & users$service_class == "class2"] <-
+    r_service_gamma(
+      sum(users$gender == "W" & users$service_class == "class2"),
+      service_mean_women_class2,
+      service_sd_women_class2
+    )
+  
+  users$service_time[users$gender == "M" & users$service_class == "class1"] <-
+    r_service_gamma(
+      sum(users$gender == "M" & users$service_class == "class1"),
+      service_mean_men_class1,
+      service_sd_men_class1
+    )
+  
+  users$service_time[users$gender == "M" & users$service_class == "class2"] <-
+    r_service_gamma(
+      sum(users$gender == "M" & users$service_class == "class2"),
+      service_mean_men_class2,
+      service_sd_men_class2
+    )
+  
+  users
+}
+
+# -----------------------------
+# Facility assignment
+# -----------------------------
+
+assign_facility <- function(users, config, np_to_gs = 0.5) {
+  
+  users$facility <- NA_character_
+  
+  if (config == "Status Quo") {
+    users$facility[users$gender == "W"] <- "women_stall"
+    users$facility[users$gender == "M" & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & users$service_class == "class2"] <- "men_stall"
+  }
+  
+  if (config == "All Unisex") {
+    users$facility <- "unisex"
+  }
+  
+  if (config == "Hybrid") {
+    
+    users$facility[users$gender == "W" & users$preference == "GS"] <- "women_stall"
+    users$facility[users$gender == "M" & users$preference == "GS" & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & users$preference == "GS" & users$service_class == "class2"] <- "men_stall"
+    
+    users$facility[users$preference == "UX"] <- "unisex"
+    
+    is_np <- users$preference == "NP"
+    go_to_gs <- runif(nrow(users)) < np_to_gs
+    
+    users$facility[users$gender == "W" & is_np & go_to_gs] <- "women_stall"
+    users$facility[users$gender == "W" & is_np & !go_to_gs] <- "unisex"
+    
+    users$facility[users$gender == "M" & is_np & go_to_gs & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & is_np & go_to_gs & users$service_class == "class2"] <- "men_stall"
+    users$facility[users$gender == "M" & is_np & !go_to_gs] <- "unisex"
+  }
+  
+  users
+}
+
+# -----------------------------
+# Queue simulation
+# -----------------------------
+
+simulate_queue <- function(queue_data, k) {
+  
+  queue_data <- queue_data |>
+    arrange(arrival_time)
+  
+  n <- nrow(queue_data)
+  server_available <- rep(0, k)
+  
+  start_time <- numeric(n)
+  completion_time <- numeric(n)
+  
+  for (i in seq_len(n)) {
+    next_server <- which.min(server_available)
+    
+    start_time[i] <- max(queue_data$arrival_time[i], server_available[next_server])
+    completion_time[i] <- start_time[i] + queue_data$service_time[i]
+    
+    server_available[next_server] <- completion_time[i]
+  }
+  
+  queue_data |>
+    mutate(
+      start_time = start_time,
+      completion_time = completion_time,
+      waiting_time = start_time - arrival_time,
+      system_time = completion_time - arrival_time
+    )
+}
+
+simulate_config <- function(users, config, np_to_gs = 0.5) {
+  
+  users_routed <- assign_facility(users, config, np_to_gs)
+  cap <- get_capacity(config)
+  
+  map_dfr(names(cap), function(fac) {
+    
+    fac_data <- users_routed |>
+      filter(facility == fac)
+    
+    if (nrow(fac_data) == 0 || cap[[fac]] == 0) {
+      return(NULL)
+    }
+    
+    simulate_queue(fac_data, k = cap[[fac]])
+    
+  }) |>
+    mutate(configuration = config)
+}
+
+run_all_configurations <- function(users, np_to_gs = 0.5) {
+  
+  c("Status Quo", "All Unisex", "Hybrid") |>
+    map_dfr(~ simulate_config(users, config = .x, np_to_gs = np_to_gs))
+}
+
+# -----------------------------
+# Equity score
+# -----------------------------
+
+add_preference_score <- function(results) {
+  
+  results |>
+    mutate(
+      uses = ifelse(facility == "unisex", "UX", "GS"),
+      wait = case_when(
+        waiting_time >= 40 ~ 40,
+        waiting_time >= 20 ~ 20,
+        waiting_time >= 10 ~ 10,
+        waiting_time >= 5  ~ 5,
+        TRUE ~ 0
+      )
+    ) |>
+    left_join(
+      score_table,
+      by = c("wait", "gender", "preference", "uses")
+    )
+}
+```
+
+```{r}
+#| label: run-stage2-four-scenarios
+#| include: false
+
+configs <- c("Status Quo", "All Unisex", "Hybrid")
+
+# Generate 500 random seeds for each scenario.
+# This avoids using one seed repeatedly and makes each replication independent.
+set.seed(seed1)
+
+seed_grid <- expand_grid(
+  rep = seq_len(n_rep),
+  scenario_id = seq_len(nrow(stage2_scenarios))
+) |>
+  mutate(
+    seed = sample.int(.Machine$integer.max, size = n(), replace = FALSE)
+  )
+
+stage2_user_results <- map_dfr(seq_len(nrow(seed_grid)), function(i) {
+  
+  r <- seed_grid$rep[i]
+  s <- seed_grid$scenario_id[i]
+  scenario_info <- stage2_scenarios[s, ]
+  
+  users <- generate_stage2_users(
+    rep_id = r,
+    seed = seed_grid$seed[i],
+    scenario = scenario_info$scenario,
+    burst_timing = scenario_info$burst_timing,
+    dominant_gender = scenario_info$dominant_gender,
+    dominant_prop = scenario_info$dominant_prop,
+    burst_prop = scenario_info$burst_prop,
+    class2_prob = scenario_info$class2_prob
+  )
+  
+  run_all_configurations(users, np_to_gs = 0.5)
+})
+
+stage2_user_results <- stage2_user_results |>
+  add_preference_score() |>
+  mutate(
+    scenario = factor(
+      scenario,
+      levels = c("Men early", "Men late", "Women early", "Women late")
+    ),
+    configuration = factor(
+      configuration,
+      levels = c("Status Quo", "All Unisex", "Hybrid")
+    )
+  )
+```
+
+### 3.2.2 Metrics used to interpret simulation results
+
+The simulation results are interpreted using both operational and equity metrics. Operational performance is described using mean waiting time and the incompletion rate by the end of the 25-minute intermission. Mean waiting time captures queueing delay. The incompletion rate measures the percentage of users whose total time in the restroom system exceeds the intermission length.
+
+Equity performance is evaluated using the same preference-based score table introduced in Section 3.1. The Totalitarian score represents the average satisfaction score across all simulated users. The Rawlsian score represents the lowest average score among stakeholder groups, highlighting the experience of the worst-served group.
+
+The ranking columns in the summary tables compare configurations within each scenario. Operational ranks are based on lower mean waiting time or lower incompletion rate, while equity ranks are based on higher Totalitarian and Rawlsian scores.
+
+\newpage
+## 3.3 Simulation results under surge demand
+
+This section presents the simulation results for the four surge-demand scenarios at the configuration level. The results compare the three restroom configurations using operational performance, incompletion risk, and equity scores. All reported values are averaged across 500 random-seed replications.
+
+```{r}
+#| label: stage2-summary
+#| include: false
+
+stage2_rep_summary <- stage2_user_results |>
+  group_by(rep, scenario, configuration) |>
+  summarise(
+    mean_wait = mean(waiting_time),
+    mean_system_time = mean(system_time),
+    p90_wait = as.numeric(quantile(waiting_time, 0.90)),
+    incompletion_rate = mean(completion_time > intermission_length) * 100,
+    pct_completed_within_25 = mean(completion_time <= intermission_length) * 100,
+    totalitarian_score = mean(score, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+rawlsian_rep_summary <- stage2_user_results |>
+  group_by(rep, scenario, configuration, gender, preference) |>
+  summarise(
+    group_score = mean(score, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  group_by(rep, scenario, configuration) |>
+  summarise(
+    rawlsian_score = min(group_score, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+stage2_rep_summary <- stage2_rep_summary |>
+  left_join(
+    rawlsian_rep_summary,
+    by = c("rep", "scenario", "configuration")
+  )
+
+stage2_summary <- stage2_rep_summary |>
+  group_by(scenario, configuration) |>
+  summarise(
+    mean_wait = mean(mean_wait),
+    mean_system_time = mean(mean_system_time),
+    p90_wait = mean(p90_wait),
+    incompletion_rate = mean(incompletion_rate),
+    pct_completed_within_25 = mean(pct_completed_within_25),
+    totalitarian_score = mean(totalitarian_score),
+    rawlsian_score = mean(rawlsian_score),
+    .groups = "drop"
+  ) |>
+  group_by(scenario) |>
+  mutate(
+    mean_wait_rank = rank(mean_wait, ties.method = "min"),
+    incompletion_rank = rank(incompletion_rate, ties.method = "min"),
+    totalitarian_rank = rank(-totalitarian_score, ties.method = "min"),
+    rawlsian_rank = rank(-rawlsian_score, ties.method = "min")
+  ) |>
+  ungroup()
+```
+
+### 3.3.1 Configuration performance across surge scenarios
+
+@tbl-stage2-configuration-performance reports the main simulation outcomes averaged across 500 random-seed replications. The table presents raw performance values only, without ranking. Ranking results are provided later in the overall decision summary.
+
+```{r}
+#| label: tbl-stage2-configuration-performance
+#| echo: false
+#| warning: false
+#| tbl-cap: "Configuration-level simulation performance across four surge-demand scenarios."
+
+stage2_summary |>
+  select(
+    Scenario = scenario,
+    Configuration = configuration,
+    `Mean wait (min)` = mean_wait,
+    `Mean system time (min)` = mean_system_time,
+    `P90 wait (min)` = p90_wait,
+    `Incompletion rate (%)` = incompletion_rate,
+    `Totalitarian score` = totalitarian_score,
+    `Rawlsian score` = rawlsian_score
+  ) |>
+  mutate(
+    across(where(is.numeric), ~ round(.x, 3))
+  ) |>
+  kable(
+    booktabs = TRUE,
+    align = "llrrrrrrr",
+    na = "—"
+  ) |>
+  kable_styling(
+    full_width = FALSE,
+    font_size = 7,
+    latex_options = "hold_position"
+  ) |>
+  column_spec(6, bold = TRUE) |>
+  collapse_rows(
+    columns = 1,
+    valign = "top"
+  )
+```
+
+
+### 3.3.2 Operational performance: mean waiting time
+
+```{r}
+#| label: fig-stage2-mean-wait-patchwork
+#| echo: false
+#| fig-width: 10
+#| fig-height: 7
+#| fig-cap: "Mean waiting time by configuration across four surge-demand scenarios, averaged over 500 random-seed replications."
+
+make_wait_plot <- function(data, scenario_name) {
+  
+  data |>
+    filter(scenario == scenario_name) |>
+    ggplot(aes(x = configuration, y = mean_wait, fill = configuration)) +
+    geom_col(width = 0.75) +
+    geom_text(
+      aes(label = sprintf("%.3f", mean_wait)),
+      vjust = -0.3,
+      size = 3
+    ) +
+    labs(
+      x = NULL,
+      y = "Mean wait (min)",
+      title = scenario_name
+    ) +
+    expand_limits(y = max(data$mean_wait, na.rm = TRUE) * 1.15) +
+    theme_minimal() +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(size = 8)
+    )
+}
+
+p_men_early <- make_wait_plot(stage2_summary, "Men early")
+p_men_late <- make_wait_plot(stage2_summary, "Men late")
+p_women_early <- make_wait_plot(stage2_summary, "Women early")
+p_women_late <- make_wait_plot(stage2_summary, "Women late")
+
+(p_men_early | p_men_late) / (p_women_early | p_women_late) +
+  plot_annotation(
+    title = "Mean Waiting Time under Four Surge Scenarios",
+    subtitle = "Each scenario is averaged over 500 random-seed replications"
+  )
+```
+
+@fig-stage2-mean-wait-patchwork compares mean waiting time across the four surge scenarios. The figure shows how mean waiting time changes with burst timing and dominant gender group. This allows the three configurations to be compared under the same surge-demand conditions, highlighting which designs are more sensitive to changes in audience composition.
+
+### 3.3.3 Operational risk: incompletion rate
+
+```{r}
+#| label: fig-stage2-incompletion-patchwork
+#| echo: false
+#| fig-width: 10
+#| fig-height: 7
+#| fig-cap: "Incompletion rate by configuration across four surge-demand scenarios, averaged over 500 random-seed replications."
+
+make_incompletion_plot <- function(data, scenario_name) {
+  
+  data |>
+    filter(scenario == scenario_name) |>
+    ggplot(aes(x = configuration, y = incompletion_rate, fill = configuration)) +
+    geom_col(width = 0.75) +
+    geom_text(
+      aes(label = sprintf("%.3f", incompletion_rate)),
+      vjust = -0.3,
+      size = 3
+    ) +
+    labs(
+      x = NULL,
+      y = "Incompletion rate (%)",
+      title = scenario_name
+    ) +
+    expand_limits(y = max(data$incompletion_rate, na.rm = TRUE) * 1.15) +
+    theme_minimal() +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(size = 8)
+    )
+}
+
+inc_men_early <- make_incompletion_plot(stage2_summary, "Men early")
+inc_men_late <- make_incompletion_plot(stage2_summary, "Men late")
+inc_women_early <- make_incompletion_plot(stage2_summary, "Women early")
+inc_women_late <- make_incompletion_plot(stage2_summary, "Women late")
+
+(inc_men_early | inc_men_late) / (inc_women_early | inc_women_late) +
+  plot_annotation(
+    title = "Incompletion Rate under Four Surge Scenarios",
+    subtitle = "Each scenario is averaged over 500 random-seed replications"
+  )
+```
+
+@fig-stage2-incompletion-patchwork compares the proportion of users who do not complete restroom use within the 25-minute intermission. This metric is especially important in late-burst scenarios, where users arrive close to the end of intermission and therefore have less time to complete service. Lower incompletion rates indicate better operational reliability under time pressure.
+
+### 3.3.4 Equity performance across scenarios
+
+```{r}
+#| label: fig-stage2-equity-patchwork
+#| echo: false
+#| fig-width: 10
+#| fig-height: 6
+#| fig-cap: "Totalitarian and Rawlsian equity scores across four surge-demand scenarios."
+
+make_equity_plot <- function(data, scenario_name) {
+  
+  data |>
+    filter(scenario == scenario_name) |>
+    select(configuration, totalitarian_score, rawlsian_score) |>
+    pivot_longer(
+      cols = c(totalitarian_score, rawlsian_score),
+      names_to = "approach",
+      values_to = "score"
+    ) |>
+    mutate(
+      approach = recode(
+        approach,
+        "totalitarian_score" = "Totalitarian",
+        "rawlsian_score" = "Rawlsian"
+      )
+    ) |>
+    ggplot(aes(x = configuration, y = score, fill = approach)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+    geom_text(
+      aes(label = sprintf("%.3f", score)),
+      position = position_dodge(width = 0.8),
+      vjust = -0.3,
+      size = 3
+    ) +
+    labs(
+      x = NULL,
+      y = "Equity score",
+      fill = "Approach",
+      title = scenario_name
+    ) +
+    coord_cartesian(ylim = c(0, 5.4), clip = "off") +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(size = 8),
+      plot.margin = margin(8, 12, 8, 8)
+    )
+}
+
+e_men_first <- make_equity_plot(stage2_summary, "Men early")
+e_men_last <- make_equity_plot(stage2_summary, "Men late")
+e_women_first <- make_equity_plot(stage2_summary, "Women early")
+e_women_last <- make_equity_plot(stage2_summary, "Women late")
+
+(e_men_first | e_men_last) / (e_women_first | e_women_last) +
+  plot_annotation(
+    title = "Totalitarian and Rawlsian Scores under Four Surge Scenarios",
+    subtitle = "Preference-based equity scores averaged over 500 random-seed replications"
+  ) & 
+    theme(legend.position = "bottom")
+```
+
+@fig-stage2-equity-patchwork compares Totalitarian and Rawlsian equity scores across the four surge-demand scenarios. The Totalitarian score measures the average preference-based satisfaction across all users, while the Rawlsian score focuses on the lowest average score among stakeholder groups. A gap between these two scores indicates that a configuration may perform well on average while still disadvantaging one group.
+
+### 3.3.5 Overall comparison and ranking
+
+```{r}
+#| label: baseline-summary-manual
+#| include: false
+
+baseline_summary <- tibble(
+  scenario = "Baseline",
+  configuration = c("Status Quo", "All Unisex", "Hybrid"),
+  mean_wait = NA_real_,
+  incompletion_rate = NA_real_,
+  incompletion_rank = NA_real_,
+  totalitarian_score = c(4.82, 4.30, 5.00),
+  totalitarian_rank = c(2, 3, 1),
+  rawlsian_score = c(3.00, 4.00, 5.00),
+  rawlsian_rank = c(3, 2, 1)
+)
+```
+
+```{r}
+#| label: final-comparison-table-data
+#| include: false
+
+simulation_summary_for_final <- stage2_summary |>
+  select(
+    scenario,
+    configuration,
+    mean_wait,
+    incompletion_rate,
+    incompletion_rank,
+    totalitarian_score,
+    totalitarian_rank,
+    rawlsian_score,
+    rawlsian_rank
+  )
+
+final_summary_table <- bind_rows(
+  baseline_summary,
+  simulation_summary_for_final
+) |>
+  mutate(
+    scenario = factor(
+      scenario,
+      levels = c(
+        "Baseline",
+        "Men early",
+        "Men late",
+        "Women early",
+        "Women late"
+      )
+    ),
+    configuration = factor(
+      configuration,
+      levels = c("Status Quo", "All Unisex", "Hybrid")
+    )
+  ) |>
+  arrange(scenario, configuration) |>
+  select(
+    Scenario = scenario,
+    Configuration = configuration,
+    `Mean wait (min)` = mean_wait,
+    `Incompletion rate (%)` = incompletion_rate,
+    `Incompletion rank` = incompletion_rank,
+    `Totalitarian score` = totalitarian_score,
+    `Totalitarian rank` = totalitarian_rank,
+    `Rawlsian score` = rawlsian_score,
+    `Rawlsian rank` = rawlsian_rank
+  )
+```
+
+```{r}
+#| label: tbl-final-summary
+#| echo: false
+#| warning: false
+#| tbl-cap: "Wait is mean waiting time in minutes. Inc. means incompletion, Tot. means Totalitarian, and Raw. means Rawlsian. Rank 1 indicates the best-performing configuration within each scenario and criterion."
+
+fmt_num <- function(x, digits = 3) {
+  ifelse(is.na(x), "\\textemdash{}", sprintf(paste0("%.", digits, "f"), x))
+}
+
+fmt_rank <- function(x) {
+  ifelse(is.na(x), "\\textemdash{}", sprintf("%.0f", x))
+}
+
+final_summary_table |>
+  transmute(
+    `Scen.` = Scenario,
+    Config = Configuration,
+    Wait = fmt_num(`Mean wait (min)`),
+    `Inc. rate` = paste0("\\textbf{", fmt_num(`Incompletion rate (%)`), "}"),
+    `Inc. rank` = paste0("\\textbf{", fmt_rank(`Incompletion rank`), "}"),
+    `Tot. score` = fmt_num(`Totalitarian score`),
+    `Tot. rank` = paste0("\\textbf{", fmt_rank(`Totalitarian rank`), "}"),
+    `Raw. score` = fmt_num(`Rawlsian score`),
+    `Raw. rank` = paste0("\\textbf{", fmt_rank(`Rawlsian rank`), "}")
+  ) |>
+  kable(
+    format = "latex",
+    booktabs = TRUE,
+    longtable = FALSE,
+    escape = FALSE,
+    align = "llrrrrrrr"
+  )
+```
+
+@tbl-final-summary provides a compact comparison for the business decision. Operational risk is represented by the incompletion rate, while equity performance is represented by the Totalitarian and Rawlsian scores. Rank 1 indicates the best-performing configuration within each scenario and criterion. The table shows a trade-off between operational efficiency and preference-based equity: All Unisex generally performs strongest on waiting and incompletion outcomes, while Hybrid performs strongest on Totalitarian and Rawlsian equity scores.
+
+# 6. Appendix
+
+## Code 
+The appendix includes the main R syntax used to generate the simulation data, run the queueing model, calculate performance metrics, and obtain the numerical results.
+
+```{r}
+#| label: setup-and-parameters-app
+#| output: false
+#| eval: false
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(patchwork)
+
+seed1 <- 123
+n_rep <- 500
+intermission_length <- 25
+
+lambda_women <- 3.2
+lambda_men <- 3.2
+
+pref_GS <- 0.70
+pref_NP <- 0.21
+pref_UX <- 0.09
+
+prob_class2 <- 0.05
+
+service_mean_women_class1 <- 1.67
+service_sd_women_class1 <- 1.2
+
+service_mean_women_class2 <- 5.2
+service_sd_women_class2 <- 3.2
+
+service_mean_men_class1 <- 0.833
+service_sd_men_class1 <- 0.7
+
+service_mean_men_class2 <- 5.2
+service_sd_men_class2 <- 3.2
+```
+
+```{r}
+#| label: score-table-app
+#| output: false
+#| eval: false
+
+score_table <- data.frame(
+  wait = c(
+    rep(0, 12), rep(5, 12), rep(10, 12), rep(20, 12), rep(40, 12)
+  ),
+  gender = c(
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M",
+    "W","W","W","W","W","W","M","M","M","M","M","M"
+  ),
+  preference = c(
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX",
+    "GS","GS","NP","NP","UX","UX","GS","GS","NP","NP","UX","UX"
+  ),
+  uses = c(
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX",
+    "GS","UX","GS","UX","GS","UX","GS","UX","GS","UX","GS","UX"
+  ),
+  score = c(
+    5,4,5,5,3,5,5,4,5,5,3,5,
+    4,3,4,4,2,4,4,3,4,4,2,4,
+    3,2,2,2,1,3,3,2,2,2,1,3,
+    1,1,1,1,0,2,2,0,1,1,0,2,
+    0,0,0,0,0,1,0,0,0,0,0,1
+  )
+)
+```
+
+```{r}
+#| label: simulation-functions-app
+#| output: false
+#| eval: false
+
+# -----------------------------
+# Gamma service time generator
+# -----------------------------
+
+r_service_gamma <- function(n, mean_service, sd_service) {
+  shape <- (mean_service / sd_service)^2
+  scale <- sd_service^2 / mean_service
+  
+  rgamma(n, shape = shape, scale = scale)
+}
+
+# -----------------------------
+# Capacity
+# -----------------------------
+
+get_capacity <- function(config) {
+  
+  if (config == "Status Quo") {
+    return(list(
+      women_stall = 20,
+      men_urinal = 10,
+      men_stall = 10,
+      unisex = 0
+    ))
+  }
+  
+  if (config == "All Unisex") {
+    return(list(
+      women_stall = 0,
+      men_urinal = 0,
+      men_stall = 0,
+      unisex = 40
+    ))
+  }
+  
+  if (config == "Hybrid") {
+    return(list(
+      women_stall = 15,
+      men_urinal = 10,
+      men_stall = 5,
+      unisex = 10
+    ))
+  }
+  
+  stop("Unknown configuration")
+}
+
+# -----------------------------
+# Generate users for one scenario and one replication
+# -----------------------------
+
+generate_stage2_users <- function(
+  rep_id,
+  seed,
+  scenario,
+  burst_timing,
+  dominant_gender,
+  dominant_prop = 0.80,
+  burst_prop = 0.80,
+  class2_prob = 0.05
+) {
+  
+  set.seed(seed)
+  
+  # Fixed expected number of users: (3.2 + 3.2) * 25 = 160
+  n_users <- round((lambda_women + lambda_men) * intermission_length)
+  
+  n_burst <- round(n_users * burst_prop)
+  n_non_burst <- n_users - n_burst
+  
+  if (burst_timing == "early") {
+    burst_arrivals <- runif(n_burst, min = 0, max = 5)
+    non_burst_arrivals <- runif(n_non_burst, min = 5, max = 25)
+  }
+  
+  if (burst_timing == "late") {
+    non_burst_arrivals <- runif(n_non_burst, min = 0, max = 20)
+    burst_arrivals <- runif(n_burst, min = 20, max = 25)
+  }
+  
+  # Gender distribution: burst group is 80% dominant gender;
+  # non-burst group is baseline 50/50.
+  other_gender <- ifelse(dominant_gender == "M", "W", "M")
+  
+  burst_gender <- sample(
+    c(dominant_gender, other_gender),
+    size = n_burst,
+    replace = TRUE,
+    prob = c(dominant_prop, 1 - dominant_prop)
+  )
+  
+  non_burst_gender <- sample(
+    c("W", "M"),
+    size = n_non_burst,
+    replace = TRUE,
+    prob = c(0.5, 0.5)
+  )
+  
+  users <- tibble(
+    rep = rep_id,
+    scenario = scenario,
+    id = 1:n_users,
+    arrival_time = c(burst_arrivals, non_burst_arrivals),
+    arrival_period = c(rep("burst", n_burst), rep("non-burst", n_non_burst)),
+    gender = c(burst_gender, non_burst_gender)
+  ) |>
+    arrange(arrival_time)
+  
+  users$service_class <- sample(
+    c("class1", "class2"),
+    n_users,
+    replace = TRUE,
+    prob = c(1 - class2_prob, class2_prob)
+  )
+  
+  users$preference <- sample(
+    c("GS", "NP", "UX"),
+    n_users,
+    replace = TRUE,
+    prob = c(pref_GS, pref_NP, pref_UX)
+  )
+  
+  users$service_time <- NA_real_
+  
+  users$service_time[users$gender == "W" & users$service_class == "class1"] <-
+    r_service_gamma(
+      sum(users$gender == "W" & users$service_class == "class1"),
+      service_mean_women_class1,
+      service_sd_women_class1
+    )
+  
+  users$service_time[users$gender == "W" & users$service_class == "class2"] <-
+    r_service_gamma(
+      sum(users$gender == "W" & users$service_class == "class2"),
+      service_mean_women_class2,
+      service_sd_women_class2
+    )
+  
+  users$service_time[users$gender == "M" & users$service_class == "class1"] <-
+    r_service_gamma(
+      sum(users$gender == "M" & users$service_class == "class1"),
+      service_mean_men_class1,
+      service_sd_men_class1
+    )
+  
+  users$service_time[users$gender == "M" & users$service_class == "class2"] <-
+    r_service_gamma(
+      sum(users$gender == "M" & users$service_class == "class2"),
+      service_mean_men_class2,
+      service_sd_men_class2
+    )
+  
+  users
+}
+
+# -----------------------------
+# Facility assignment
+# -----------------------------
+
+assign_facility <- function(users, config, np_to_gs = 0.5) {
+  
+  users$facility <- NA_character_
+  
+  if (config == "Status Quo") {
+    users$facility[users$gender == "W"] <- "women_stall"
+    users$facility[users$gender == "M" & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & users$service_class == "class2"] <- "men_stall"
+  }
+  
+  if (config == "All Unisex") {
+    users$facility <- "unisex"
+  }
+  
+  if (config == "Hybrid") {
+    
+    users$facility[users$gender == "W" & users$preference == "GS"] <- "women_stall"
+    users$facility[users$gender == "M" & users$preference == "GS" & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & users$preference == "GS" & users$service_class == "class2"] <- "men_stall"
+    
+    users$facility[users$preference == "UX"] <- "unisex"
+    
+    is_np <- users$preference == "NP"
+    go_to_gs <- runif(nrow(users)) < np_to_gs
+    
+    users$facility[users$gender == "W" & is_np & go_to_gs] <- "women_stall"
+    users$facility[users$gender == "W" & is_np & !go_to_gs] <- "unisex"
+    
+    users$facility[users$gender == "M" & is_np & go_to_gs & users$service_class == "class1"] <- "men_urinal"
+    users$facility[users$gender == "M" & is_np & go_to_gs & users$service_class == "class2"] <- "men_stall"
+    users$facility[users$gender == "M" & is_np & !go_to_gs] <- "unisex"
+  }
+  
+  users
+}
+
+# -----------------------------
+# Queue simulation
+# -----------------------------
+
+simulate_queue <- function(queue_data, k) {
+  
+  queue_data <- queue_data |>
+    arrange(arrival_time)
+  
+  n <- nrow(queue_data)
+  server_available <- rep(0, k)
+  
+  start_time <- numeric(n)
+  completion_time <- numeric(n)
+  
+  for (i in seq_len(n)) {
+    next_server <- which.min(server_available)
+    
+    start_time[i] <- max(queue_data$arrival_time[i], server_available[next_server])
+    completion_time[i] <- start_time[i] + queue_data$service_time[i]
+    
+    server_available[next_server] <- completion_time[i]
+  }
+  
+  queue_data |>
+    mutate(
+      start_time = start_time,
+      completion_time = completion_time,
+      waiting_time = start_time - arrival_time,
+      system_time = completion_time - arrival_time
+    )
+}
+
+simulate_config <- function(users, config, np_to_gs = 0.5) {
+  
+  users_routed <- assign_facility(users, config, np_to_gs)
+  cap <- get_capacity(config)
+  
+  map_dfr(names(cap), function(fac) {
+    
+    fac_data <- users_routed |>
+      filter(facility == fac)
+    
+    if (nrow(fac_data) == 0 || cap[[fac]] == 0) {
+      return(NULL)
+    }
+    
+    simulate_queue(fac_data, k = cap[[fac]])
+    
+  }) |>
+    mutate(configuration = config)
+}
+
+run_all_configurations <- function(users, np_to_gs = 0.5) {
+  
+  c("Status Quo", "All Unisex", "Hybrid") |>
+    map_dfr(~ simulate_config(users, config = .x, np_to_gs = np_to_gs))
+}
+
+# -----------------------------
+# Equity score
+# -----------------------------
+
+add_preference_score <- function(results) {
+  
+  results |>
+    mutate(
+      uses = ifelse(facility == "unisex", "UX", "GS"),
+      wait = case_when(
+        waiting_time >= 40 ~ 40,
+        waiting_time >= 20 ~ 20,
+        waiting_time >= 10 ~ 10,
+        waiting_time >= 5  ~ 5,
+        TRUE ~ 0
+      )
+    ) |>
+    left_join(
+      score_table,
+      by = c("wait", "gender", "preference", "uses")
+    )
+}
+```
+
+```{r}
+#| label: run-stage2-four-scenarios-app
+#| output: false
+#| eval: false
+
+configs <- c("Status Quo", "All Unisex", "Hybrid")
+
+# Generate 500 random seeds for each scenario.
+# This avoids using one seed repeatedly and makes each replication independent.
+set.seed(seed1)
+
+seed_grid <- expand_grid(
+  rep = seq_len(n_rep),
+  scenario_id = seq_len(nrow(stage2_scenarios))
+) |>
+  mutate(
+    seed = sample.int(.Machine$integer.max, size = n(), replace = FALSE)
+  )
+
+stage2_user_results <- map_dfr(seq_len(nrow(seed_grid)), function(i) {
+  
+  r <- seed_grid$rep[i]
+  s <- seed_grid$scenario_id[i]
+  scenario_info <- stage2_scenarios[s, ]
+  
+  users <- generate_stage2_users(
+    rep_id = r,
+    seed = seed_grid$seed[i],
+    scenario = scenario_info$scenario,
+    burst_timing = scenario_info$burst_timing,
+    dominant_gender = scenario_info$dominant_gender,
+    dominant_prop = scenario_info$dominant_prop,
+    burst_prop = scenario_info$burst_prop,
+    class2_prob = scenario_info$class2_prob
+  )
+  
+  run_all_configurations(users, np_to_gs = 0.5)
+})
+
+stage2_user_results <- stage2_user_results |>
+  add_preference_score() |>
+  mutate(
+    scenario = factor(
+      scenario,
+      levels = c("Men early", "Men late", "Women early", "Women late")
+    ),
+    configuration = factor(
+      configuration,
+      levels = c("Status Quo", "All Unisex", "Hybrid")
+    )
+  )
+```
+
+```{r}
+#| label: stage2-summary-app
+#| output: false
+#| eval: false
+
+stage2_rep_summary <- stage2_user_results |>
+  group_by(rep, scenario, configuration) |>
+  summarise(
+    mean_wait = mean(waiting_time),
+    mean_system_time = mean(system_time),
+    p90_wait = as.numeric(quantile(waiting_time, 0.90)),
+    incompletion_rate = mean(completion_time > intermission_length) * 100,
+    pct_completed_within_25 = mean(completion_time <= intermission_length) * 100,
+    totalitarian_score = mean(score, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+rawlsian_rep_summary <- stage2_user_results |>
+  group_by(rep, scenario, configuration, gender, preference) |>
+  summarise(
+    group_score = mean(score, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  group_by(rep, scenario, configuration) |>
+  summarise(
+    rawlsian_score = min(group_score, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+stage2_rep_summary <- stage2_rep_summary |>
+  left_join(
+    rawlsian_rep_summary,
+    by = c("rep", "scenario", "configuration")
+  )
+
+stage2_summary <- stage2_rep_summary |>
+  group_by(scenario, configuration) |>
+  summarise(
+    mean_wait = mean(mean_wait),
+    mean_system_time = mean(mean_system_time),
+    p90_wait = mean(p90_wait),
+    incompletion_rate = mean(incompletion_rate),
+    pct_completed_within_25 = mean(pct_completed_within_25),
+    totalitarian_score = mean(totalitarian_score),
+    rawlsian_score = mean(rawlsian_score),
+    .groups = "drop"
+  ) |>
+  group_by(scenario) |>
+  mutate(
+    mean_wait_rank = rank(mean_wait, ties.method = "min"),
+    incompletion_rank = rank(incompletion_rate, ties.method = "min"),
+    totalitarian_rank = rank(-totalitarian_score, ties.method = "min"),
+    rawlsian_rank = rank(-rawlsian_score, ties.method = "min")
+  ) |>
+  ungroup()
+```
+
+## Acknowledgements
+
+AI tools were used to support the preparation of this report for educational purposes. Their use was limited to assisting with code debugging, wording refinement, and report formatting.
+
+Specifically, AI assistance was used for:
+
+- checking the consistency of the queueing and simulation logic;
+- debugging R code and improving reproducibility;
+- improving the readability of tables, figures, and written explanations;
+- refining the structure and wording of the report.
+
+All AI-generated content was critically reviewed, edited, and adapted by the authors. The final modelling decisions, analysis, interpretation, and recommendations are the responsibility of the group members.
